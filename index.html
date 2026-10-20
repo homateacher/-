@@ -104,9 +104,9 @@
           <span id="bells-display" class="text-xs sm:text-lg text-amber-900">3,500</span> <span class="text-[10px] sm:text-xs">벨</span>
         </div>
         <!-- Time & Weather -->
-        <div class="flex items-center gap-1 bg-[#d3e3a4] px-2.5 py-1 rounded-full border-2 border-[#8ba352] text-[#3b5212] font-semibold text-[11px] sm:text-sm">
+        <div class="flex items-center gap-1 bg-[#d3e3a4] px-2.5 py-1 rounded-full border-2 border-[#8ba352] text-[#3b5212] font-semibold text-[11px] sm:text-sm min-w-[110px] justify-center tabular-nums whitespace-nowrap shadow-sm">
           <span id="time-icon">☀️</span>
-          <span id="time-display">낮 12:00</span>
+          <span id="time-display">낮 12시</span>
           <span id="weather-display" class="hidden sm:inline">☀️ 맑음</span>
         </div>
         <!-- Poison Status Indicator -->
@@ -169,7 +169,7 @@
       <!-- Controls Info Bar -->
       <div class="absolute top-2 left-2 flex justify-between items-center pointer-events-none z-10">
         <div id="location-badge" class="bg-amber-100/90 text-amber-900 font-bold text-[11px] sm:text-xs px-2.5 py-1 rounded-lg border border-amber-800 shadow">
-          🏝️ 힐링 미니 섬 (⛏️ 광산 구역 추가)
+          🏝️ 호마랜드 (⛏️ 광산 구역 추가)
         </div>
       </div>
     </div>
@@ -644,7 +644,7 @@
     // Map Entities & Interior State
     let currentMap = 'island';
     const houseInteriorFurniture = [
-      { id: 'furniture_bed', x: 250, y: 180 },
+      { id: 'furniture_bed', x: 380, y: 440 }, // Moved closer to entrance (x: 380, y: 440)
       { id: 'furniture_plant', x: 620, y: 180 }
     ];
 
@@ -652,7 +652,7 @@
     let bugs = [];
     let fossils = [];
     let floatingTexts = [];
-
+    let poisonRecoveryTimer = 0; // Natural Poison Recovery Counter
     // Map Buildings & Mining Zone Coordinates
     const shopBuilding = { x: 950, y: 350, width: 100, height: 85 };
     const museumBuilding = { x: 1150, y: 350, width: 110, height: 90 };
@@ -668,6 +668,9 @@
       keys[e.key.toLowerCase()] = true;
       if ([' ', 'i', 'e', 'm', 'c'].includes(e.key.toLowerCase())) {
         if (document.activeElement.tagName !== 'INPUT') e.preventDefault();
+      }
+      if (e.key === 'Escape') {
+        document.querySelectorAll('.fixed:not(.hidden)').forEach(modal => modal.classList.add('hidden'));
       }
       if (e.key.toLowerCase() === 'i') toggleModal('inventory-modal');
       if (e.key.toLowerCase() === 'e') toggleModal('shop-modal');
@@ -1139,6 +1142,26 @@
       if (gameTime >= 24 * 60) gameTime = 0;
       updateTimeDisplay();
 
+      // Natural poison recovery over time (every 30 seconds = 1800 frames at 60fps)
+      if (player.poisonStungCount > 0) {
+        poisonRecoveryTimer++;
+        if (poisonRecoveryTimer >= 1800) {
+          poisonRecoveryTimer = 0;
+          player.poisonStungCount--;
+          if (player.poisonStungCount === 0) {
+            document.getElementById('status-debuff').classList.add('hidden');
+            showFloatingText("💊 시간 경과로 벌/독 독성이 완전히 사라졌습니다!", player.x, player.y - 60, '#4ade80');
+          } else {
+            const speedRatio = Math.max(12.5, 100 / Math.pow(2, player.poisonStungCount));
+            document.getElementById('poison-count-text').innerText = player.poisonStungCount;
+            document.getElementById('poison-speed-text').innerText = speedRatio.toFixed(1);
+            showFloatingText(`💊 시간이 지나 독성이 1단계 완화되었습니다. (현재 ${player.poisonStungCount}회 중첩)`, player.x, player.y - 60, '#60a5fa');
+          }
+        }
+      } else {
+        poisonRecoveryTimer = 0;
+      }
+
       if (player.isTrapped) {
         player.trappedTimer--;
         if (player.trappedTimer <= 0) player.isTrapped = false;
@@ -1261,6 +1284,70 @@
 
     function render() {
       if (currentMap === 'house') {
+        // Bed Sleep & Complete Cure
+        const bedObj = houseInteriorFurniture.find(f => f.id === 'furniture_bed');
+        if (bedObj && Math.hypot(player.x - bedObj.x, player.y - bedObj.y) < 55) {
+          sfx.sleep();
+          player.poisonStungCount = 0; // Reset all poison stacks!
+          document.getElementById('status-debuff').classList.add('hidden');
+          showFloatingText("😴 푹 쉬고 건강을 완치했다! (벌/독 완전 치료)", player.x, player.y - 60, '#4ade80');
+          return;
+        }
+
+        if (player.y > 500) {
+          currentMap = 'island';
+          player.x = playerHouse.x + playerHouse.width/2;
+          player.y = playerHouse.y + playerHouse.height + 20;
+          document.getElementById('location-badge').innerText = '🏝️ 호마랜드';
+          return;
+        }
+      }
+<!-- ... existing text ... -->
+      if (hitPos >= miningRhythm.targetStart && hitPos <= targetEnd) {
+        sfx.mineHit();
+        sfx.fanfare();
+
+        // Mining Drop Rewards! (Iron, Gold, Ruby, Sapphire, Emerald)
+        const rand = Math.random();
+        let dropped = 'iron';
+        if (rand < 0.08) dropped = 'emerald';
+        else if (rand < 0.18) dropped = 'sapphire';
+        else if (rand < 0.30) dropped = 'ruby';
+        else if (rand < 0.55) dropped = 'gold_nugget';
+
+        const item = ITEM_DB[dropped];
+        player.inventory.push(dropped);
+        showFloatingText(`🎯 PERFECT! ${item.name} ${item.icon} 채굴 성공!`, player.x, player.y - 60, '#4ade80');
+        updateInventoryUI();
+      } else {
+        sfx.shake();
+        showFloatingText("💥 빗나갔다! (채굴 실패)", player.x, player.y - 60, '#ef4444');
+      }
+<!-- ... existing text ... -->
+    function showFloatingText(text, x, y, color = '#ffffff') {
+      floatingTexts.push({ text, x, y, alpha: 1.0, color });
+    }
+<!-- ... existing text ... -->
+      if (foundText) {
+        prompt.classList.remove('hidden');
+        actionText.innerText = foundText;
+
+        const cameraX = Math.max(0, Math.min(WORLD_WIDTH - canvas.width, player.x - canvas.width / 2));
+        const cameraY = Math.max(0, Math.min(WORLD_HEIGHT - canvas.height, player.y - canvas.height / 2));
+        const screenX = (player.x - cameraX) * (canvas.clientWidth / canvas.width);
+        const screenY = (player.y - cameraY + 35) * (canvas.clientHeight / canvas.height);
+
+        prompt.style.left = `${screenX}px`;
+        prompt.style.top = `${screenY}px`;
+      } else {
+        prompt.classList.add('hidden');
+      }
+    }
+
+    function render() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      if (currentMap === 'house') {
         renderHouseInterior();
         return;
       }
@@ -1271,112 +1358,111 @@
       ctx.save();
       ctx.translate(-cameraX, -cameraY);
 
-      // Grass Base
-      ctx.fillStyle = '#55efc4'; ctx.fillRect(0, 0, WORLD_WIDTH, WORLD_HEIGHT);
-      ctx.fillStyle = '#00b894';
-      for (let x = 60; x < WORLD_WIDTH; x += 140) {
-        for (let y = 60; y < WORLD_HEIGHT - 300; y += 120) {
-          ctx.beginPath(); ctx.arc(x, y, 14, 0, Math.PI * 2); ctx.fill();
-        }
-      }
+      // Grass Background
+      ctx.fillStyle = '#599632';
+      ctx.fillRect(0, 0, WORLD_WIDTH, WORLD_HEIGHT);
 
-      // Beach & Ocean
-      ctx.fillStyle = '#ffeaa7'; ctx.fillRect(0, 810, WORLD_WIDTH, 70);
-      ctx.fillStyle = '#74b9ff'; ctx.fillRect(0, 880, WORLD_WIDTH, WORLD_HEIGHT - 880);
+      // River / Sea Body
+      ctx.fillStyle = '#38bdf8';
+      ctx.fillRect(0, 850, WORLD_WIDTH, 250);
 
-      // Mining Rocks Area
-      ctx.fillStyle = '#636e72';
-      ctx.beginPath(); ctx.roundRect(mineZoneObj.x, mineZoneObj.y, mineZoneObj.width, mineZoneObj.height, 16); ctx.fill();
-      ctx.fillStyle = '#fff'; ctx.font = '24px sans-serif'; ctx.fillText('⛰️⛏️', mineZoneObj.x + 35, mineZoneObj.y + 55);
-      ctx.font = '12px Jua'; ctx.fillText("신비한 광산", mineZoneObj.x + 35, mineZoneObj.y + 85);
+      // Mine Zone Area
+      ctx.fillStyle = '#64748b';
+      ctx.beginPath();
+      ctx.roundRect(mineZoneObj.x, mineZoneObj.y, mineZoneObj.width, mineZoneObj.height, 16);
+      ctx.fill();
+      ctx.fillStyle = '#ffffff';
+      ctx.font = 'bold 16px Jua';
+      ctx.fillText("⛰️ 신비한 광산", mineZoneObj.x + 20, mineZoneObj.y + 65);
 
-      // Rain Effects
-      if (isRaining) {
-        ctx.strokeStyle = 'rgba(255, 255, 255, 0.4)';
-        ctx.lineWidth = 1.5;
-        const timeOffset = Date.now() * 0.05;
-        for (let i = 0; i < 80; i++) {
-          let rx = (i * 25 + timeOffset * 5) % WORLD_WIDTH;
-          let ry = (i * 18 + timeOffset * 10) % WORLD_HEIGHT;
-          ctx.beginPath(); ctx.moveTo(rx, ry); ctx.lineTo(rx - 4, ry + 12); ctx.stroke();
-        }
-      }
-
-      // Plaza Pathways
-      ctx.fillStyle = '#eccc68';
-      ctx.beginPath(); ctx.roundRect(shopBuilding.x - 30, shopBuilding.y + 40, 360, 90, 16); ctx.fill();
-
-      // Crafting Bench
-      ctx.fillStyle = '#b71540';
-      ctx.fillRect(craftBenchObj.x, craftBenchObj.y, craftBenchObj.width, craftBenchObj.height);
-      ctx.fillStyle = '#fff'; ctx.font = '16px sans-serif'; ctx.fillText('🔨', craftBenchObj.x + 14, craftBenchObj.y + 26);
-
-      // Fossils Ground Dig Spots
-      fossils.forEach(f => {
-        ctx.strokeStyle = '#78e08f'; ctx.lineWidth = 4;
-        ctx.beginPath(); ctx.moveTo(f.x - 8, f.y - 8); ctx.lineTo(f.x + 8, f.y + 8);
-        ctx.moveTo(f.x + 8, f.y - 8); ctx.lineTo(f.x - 8, f.y + 8); ctx.stroke();
-      });
-
-      // Shop
-      ctx.fillStyle = '#e67e22'; ctx.fillRect(shopBuilding.x, shopBuilding.y, shopBuilding.width, shopBuilding.height);
-      ctx.fillStyle = '#d35400';
-      ctx.beginPath(); ctx.moveTo(shopBuilding.x - 10, shopBuilding.y);
-      ctx.lineTo(shopBuilding.x + shopBuilding.width/2, shopBuilding.y - 35);
-      ctx.lineTo(shopBuilding.x + shopBuilding.width + 10, shopBuilding.y); ctx.fill();
-      ctx.fillStyle = '#fff'; ctx.font = '20px sans-serif'; ctx.fillText('🏪', shopBuilding.x + 36, shopBuilding.y + 45);
-
-      // Museum
-      ctx.fillStyle = '#2c3e50'; ctx.fillRect(museumBuilding.x, museumBuilding.y, museumBuilding.width, museumBuilding.height);
-      ctx.fillStyle = '#34495e';
-      ctx.beginPath(); ctx.moveTo(museumBuilding.x - 10, museumBuilding.y);
-      ctx.lineTo(museumBuilding.x + museumBuilding.width/2, museumBuilding.y - 35);
-      ctx.lineTo(museumBuilding.x + museumBuilding.width + 10, museumBuilding.y); ctx.fill();
-      ctx.fillStyle = '#fff'; ctx.font = '22px sans-serif'; ctx.fillText('🦉', museumBuilding.x + 40, museumBuilding.y + 48);
-
+      // Buildings
       // Player House
-      const hColor = player.houseUpgrade === 0 ? '#3498db' : '#9b59b6';
-      ctx.fillStyle = hColor; ctx.fillRect(playerHouse.x, playerHouse.y, playerHouse.width, playerHouse.height);
-      ctx.fillStyle = '#2980b9';
-      ctx.beginPath(); ctx.moveTo(playerHouse.x - 8, playerHouse.y);
-      ctx.lineTo(playerHouse.x + playerHouse.width/2, playerHouse.y - 30);
-      ctx.lineTo(playerHouse.x + playerHouse.width + 8, playerHouse.y); ctx.fill();
-      ctx.fillStyle = '#fff'; ctx.font = '12px Jua'; ctx.fillText("내 집", playerHouse.x + 30, playerHouse.y + 45);
+      ctx.fillStyle = '#f97316';
+      ctx.fillRect(playerHouse.x, playerHouse.y, playerHouse.width, playerHouse.height);
+      ctx.fillStyle = '#ea580c';
+      ctx.beginPath();
+      ctx.moveTo(playerHouse.x - 10, playerHouse.y);
+      ctx.lineTo(playerHouse.x + playerHouse.width / 2, playerHouse.y - 35);
+      ctx.lineTo(playerHouse.x + playerHouse.width + 10, playerHouse.y);
+      ctx.closePath();
+      ctx.fill();
+      ctx.fillStyle = '#ffffff';
+      ctx.font = 'bold 14px Jua';
+      ctx.fillText("🏠 내 집", playerHouse.x + 20, playerHouse.y + 45);
+
+      // Shop Building
+      ctx.fillStyle = '#eab308';
+      ctx.fillRect(shopBuilding.x, shopBuilding.y, shopBuilding.width, shopBuilding.height);
+      ctx.fillStyle = '#ffffff';
+      ctx.font = 'bold 14px Jua';
+      ctx.fillText("🏪 너굴 상점", shopBuilding.x + 12, shopBuilding.y + 45);
+
+      // Museum Building
+      ctx.fillStyle = '#059669';
+      ctx.fillRect(museumBuilding.x, museumBuilding.y, museumBuilding.width, museumBuilding.height);
+      ctx.fillStyle = '#ffffff';
+      ctx.font = 'bold 14px Jua';
+      ctx.fillText("🏛️ 박물관", museumBuilding.x + 25, museumBuilding.y + 50);
+
+      // Craft Bench
+      ctx.fillStyle = '#b45309';
+      ctx.fillRect(craftBenchObj.x, craftBenchObj.y, craftBenchObj.width, craftBenchObj.height);
+      ctx.fillStyle = '#ffffff';
+      ctx.font = 'bold 12px Jua';
+      ctx.fillText("🔨 DIY", craftBenchObj.x + 10, craftBenchObj.y + 25);
+
+      // Fossils Dig Spots
+      fossils.forEach(f => {
+        ctx.fillStyle = '#78350f';
+        ctx.font = 'bold 18px Jua';
+        ctx.fillText("❌", f.x - 8, f.y + 6);
+      });
 
       // Trees
       trees.forEach(t => {
-        ctx.fillStyle = '#795548'; ctx.fillRect(t.x - 8, t.y - 10, 16, 25);
-        ctx.fillStyle = '#2e7d32';
-        ctx.beginPath(); ctx.arc(t.x, t.y - 25, t.radius, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = '#15803d';
+        ctx.beginPath();
+        ctx.arc(t.x, t.y - 15, t.radius + 6, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = '#854d0e';
+        ctx.fillRect(t.x - 6, t.y - 5, 12, 20);
+
         if (t.hasFruit) {
           ctx.font = '16px sans-serif';
-          ctx.fillText(ITEM_DB[t.fruit].icon, t.x - 12, t.y - 25);
+          ctx.fillText(ITEM_DB[t.fruit].icon, t.x - 8, t.y - 20);
         }
       });
 
       // Bugs
       bugs.forEach(b => {
-        const item = ITEM_DB[`bug_${b.dbIdx}`];
+        const bugItem = BUGS_DATA[b.dbIdx];
         ctx.font = '16px sans-serif';
-        ctx.fillText(item.icon, b.x, b.y);
+        ctx.fillText(bugItem.icon, b.x - 8, b.y + 6);
       });
 
-      // Fishing Line
+      // Fishing Bobber Animation
       if (fishingState.active) {
-        ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 1.5;
-        ctx.beginPath(); ctx.moveTo(player.x, player.y - 10); ctx.lineTo(fishingState.bobberX, fishingState.bobberY); ctx.stroke();
-        ctx.fillStyle = '#ff4757'; ctx.beginPath(); ctx.arc(fishingState.bobberX, fishingState.bobberY, 5, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = '#ef4444';
+        ctx.beginPath();
+        ctx.arc(fishingState.bobberX, fishingState.bobberY, 6, 0, Math.PI * 2);
+        ctx.fill();
+
         if (fishingState.stage === 'nibble') {
-          ctx.fillStyle = '#ff0000'; ctx.font = 'bold 24px Jua'; ctx.fillText('!', fishingState.bobberX - 4, fishingState.bobberY - 15);
+          ctx.fillStyle = '#ffffff';
+          ctx.font = 'bold 22px Jua';
+          ctx.fillText("!", fishingState.bobberX - 4, fishingState.bobberY - 12);
         }
       }
 
+      // Render Player Avatar
       renderPlayerAvatar(player.x, player.y);
 
       // Floating Popups
       floatingTexts.forEach(ft => {
-        ctx.fillStyle = ft.color; ctx.globalAlpha = Math.max(0, ft.alpha);
-        ctx.font = 'bold 16px Jua'; ctx.fillText(ft.text, ft.x - 20, ft.y);
+        ctx.fillStyle = ft.color;
+        ctx.globalAlpha = Math.max(0, ft.alpha);
+        ctx.font = 'bold 20px Jua';
+        ctx.fillText(ft.text, ft.x - 30, ft.y);
         ctx.globalAlpha = 1.0;
       });
 
@@ -1476,12 +1562,10 @@
 
     function updateTimeDisplay() {
       const hours = Math.floor(gameTime / 60);
-      const mins = Math.floor(gameTime % 60);
       const paddedHours = hours < 10 ? '0' + hours : hours;
-      const paddedMins = mins < 10 ? '0' + mins : mins;
       const isNight = hours >= 19 || hours < 6;
       
-      const timeStr = `${isNight ? '밤' : '낮'} ${paddedHours}:${paddedMins}`;
+      const timeStr = `${isNight ? '밤' : '낮'} ${paddedHours}시`;
       const timeElem = document.getElementById('time-display');
       
       if (timeElem.innerText !== timeStr) {
