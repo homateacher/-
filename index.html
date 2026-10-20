@@ -117,6 +117,9 @@
 
       <!-- Action Nav Buttons -->
       <div class="flex items-center gap-1 sm:gap-2">
+        <button id="btn-help" class="btn-wood px-2 py-1 sm:px-2.5 sm:py-1.5 rounded-xl font-bold text-xs sm:text-sm bg-blue-600 border-blue-800 flex items-center gap-1">
+          ❓ <span class="hidden md:inline">도움말</span>
+        </button>
         <button id="btn-inventory" class="btn-wood px-2 py-1 sm:px-2.5 sm:py-1.5 rounded-xl font-bold text-xs sm:text-sm flex items-center gap-1">
           🎒 <span class="hidden md:inline">가방 (I)</span>
         </button>
@@ -339,6 +342,41 @@
 
       <div id="crafting-list" class="space-y-1.5 overflow-y-auto max-h-[280px] pr-1">
         <!-- Recipes dynamically rendered -->
+      </div>
+    </div>
+  </div>
+
+  <!-- HELP & INSTRUCTIONS MODAL -->
+  <div id="help-modal" class="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center hidden z-50 p-3">
+    <div class="wood-panel w-full max-w-lg p-5 flex flex-col max-h-[90vh]">
+      <div class="flex justify-between items-center border-b-2 border-[#b89868] pb-2 mb-3">
+        <div class="flex items-center gap-2">
+          <span class="text-2xl sm:text-3xl">📖</span>
+          <h2 class="text-lg sm:text-xl font-bold text-[#5c3a1b]">섬 생활 초보자 가이드</h2>
+        </div>
+        <button id="close-help" class="text-gray-500 hover:text-red-500 font-bold text-xl px-2">✕</button>
+      </div>
+
+      <div class="space-y-3 overflow-y-auto text-xs sm:text-sm text-[#5c3a1b] pr-1 leading-relaxed">
+        <div class="bg-[#f0e3c4] p-3 rounded-xl border border-[#a67c42]">
+          <h3 class="font-bold text-amber-900 mb-1 text-sm">🎮 조작법 (PC & 모바일)</h3>
+          <p>• <b>PC:</b> 방향키 / WASD로 이동, <kbd class="bg-white px-1.5 py-0.5 rounded border">Space</kbd> 키로 동작 및 채집</p>
+          <p>• <b>모바일:</b> 좌측 하단 D-Pad 방향키, 우측 하단 ✨ <b>[동작]</b> 터치 버튼</p>
+          <p>• <b>단축키:</b> <kbd class="bg-white px-1 py-0.5 rounded">I</kbd> 가방 | <kbd class="bg-white px-1 py-0.5 rounded">E</kbd> 상점 | <kbd class="bg-white px-1 py-0.5 rounded">M</kbd> 박물관 | <kbd class="bg-white px-1 py-0.5 rounded">C</kbd> DIY</p>
+        </div>
+
+        <div class="bg-[#f0e3c4] p-3 rounded-xl border border-[#a67c42]">
+          <h3 class="font-bold text-amber-900 mb-1 text-sm">🌱 섬 활동 & 채집</h3>
+          <p>• <b>나무 털기:</b> 과일/목재/벨/가구 획득! (확률적으로 🐝벌이 떨어지면 속도 감소 디버프)</p>
+          <p>• <b>상점 도구 구매 & 착용:</b> 낚시(물가), 곤충 채집, 화석 발굴(X 표시), 광산 채굴(⛰️ 구역)은 가방에서 해당 도구를 장착해야 가능합니다.</p>
+          <p>• <b>⛏️ 광산 타이밍 채굴:</b> 곡괭이 장착 후 광산에서 타이밍 게이지 녹색 Zone에 맞추어 버튼을 누르면 희귀 광석/보석(루비, 사파이어, 에메랄드) 획득!</p>
+        </div>
+
+        <div class="bg-[#f0e3c4] p-3 rounded-xl border border-[#a67c42]">
+          <h3 class="font-bold text-amber-900 mb-1 text-sm">🏥 독 치료 & 성장</h3>
+          <p>• <b>벌/독 치료:</b> 내 집 🏠으로 들어가 침대 🛏️에서 쉬면 누적된 독이 모두 완치됩니다.</p>
+          <p>• <b>너굴 상점 & DIY:</b> 채집품을 판매해 벨을 모으고, 고급 도구/패션 의상/가구를 구매하거나 DIY 작업대 🔨에서 고티어 아이템을 제작해보세요!</p>
+        </div>
       </div>
     </div>
   </div>
@@ -1439,9 +1477,17 @@
     function updateTimeDisplay() {
       const hours = Math.floor(gameTime / 60);
       const mins = Math.floor(gameTime % 60);
+      const paddedHours = hours < 10 ? '0' + hours : hours;
       const paddedMins = mins < 10 ? '0' + mins : mins;
-      document.getElementById('time-display').innerText = `${hours >= 19 || hours < 6 ? '밤' : '낮'} ${hours}:${paddedMins}`;
-      document.getElementById('time-icon').innerText = hours >= 19 || hours < 6 ? '🌙' : '☀️';
+      const isNight = hours >= 19 || hours < 6;
+      
+      const timeStr = `${isNight ? '밤' : '낮'} ${paddedHours}:${paddedMins}`;
+      const timeElem = document.getElementById('time-display');
+      
+      if (timeElem.innerText !== timeStr) {
+        timeElem.innerText = timeStr;
+      }
+      document.getElementById('time-icon').innerText = isNight ? '🌙' : '☀️';
     }
 
     function updateBellsUI() {
@@ -1830,6 +1876,8 @@
     };
 
     // NAV UI TRIGGERS
+    document.getElementById('btn-help').onclick = () => toggleModal('help-modal');
+    document.getElementById('close-help').onclick = () => toggleModal('help-modal');
     document.getElementById('btn-inventory').onclick = () => toggleModal('inventory-modal');
     document.getElementById('close-inventory').onclick = () => toggleModal('inventory-modal');
     document.getElementById('btn-shop').onclick = () => toggleModal('shop-modal');
