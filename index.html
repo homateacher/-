@@ -1,0 +1,1863 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>동물의 숲 2D 스페셜 확장판 - Real Mobile & Mining Rhythm Game</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Jua&display=swap');
+    
+    * {
+      touch-action: manipulation;
+    }
+
+    body {
+      font-family: 'Jua', sans-serif;
+      background-color: #1e3a29;
+      user-select: none;
+      -webkit-user-select: none;
+      overflow: hidden;
+    }
+
+    canvas {
+      image-rendering: pixelated;
+      image-rendering: crisp-edges;
+    }
+
+    ::-webkit-scrollbar {
+      width: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: #f1e4c3;
+      border-radius: 8px;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #8b5a2b;
+      border-radius: 8px;
+    }
+
+    .wood-panel {
+      background: #fbf3d5;
+      border: 4px solid #8b5a2b;
+      box-shadow: 0 8px 0 #5c3a1b, inset 0 0 10px rgba(0,0,0,0.1);
+      border-radius: 18px;
+    }
+
+    .btn-wood {
+      background: linear-gradient(to bottom, #7acc52, #479e23);
+      border: 2px solid #285e10;
+      box-shadow: 0 4px 0 #1b420a;
+      color: white;
+      text-shadow: 1px 1px 0 #1b420a;
+      transition: all 0.1s ease;
+    }
+    .btn-wood:active { transform: translateY(2px); box-shadow: 0 2px 0 #1b420a; }
+
+    .tab-btn {
+      padding: 6px 10px;
+      border-radius: 10px 10px 0 0;
+      font-weight: bold;
+      transition: all 0.15s;
+      cursor: pointer;
+    }
+    .tab-active {
+      background-color: #8b5a2b;
+      color: #ffffff;
+      border-bottom: 3px solid #5c3a1b;
+    }
+    .tab-inactive {
+      background-color: #e2d4b3;
+      color: #8c6b43;
+    }
+
+    /* Mobile D-Pad & Action Touch Controls */
+    .touch-btn {
+      background: rgba(251, 243, 213, 0.85);
+      border: 3px solid #8b5a2b;
+      box-shadow: 0 4px 0 #5c3a1b;
+      border-radius: 16px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: bold;
+      color: #5c3a1b;
+      active: scale(0.95);
+    }
+    .touch-btn:active {
+      background: #e2d4b3;
+      transform: translateY(2px);
+      box-shadow: 0 1px 0 #5c3a1b;
+    }
+  </style>
+</head>
+<body class="flex flex-col items-center justify-center min-h-screen text-slate-800 p-1 sm:p-4">
+
+  <!-- HUD Upper Header -->
+  <div class="relative flex flex-col items-center w-full max-w-[900px]">
+    
+    <div class="w-full flex justify-between items-center bg-[#fdf6e2] border-4 border-[#8b5a2b] rounded-t-2xl p-2 shadow-md z-10 text-xs sm:text-base">
+      <div class="flex items-center gap-1.5 sm:gap-3">
+        <!-- Bells -->
+        <div class="flex items-center gap-1 bg-[#e6ce9a] px-2.5 py-1 rounded-full border-2 border-[#a67c42] font-bold text-[#5c3a1b]">
+          <span class="text-base sm:text-xl">🔔</span>
+          <span id="bells-display" class="text-xs sm:text-lg text-amber-900">3,500</span> <span class="text-[10px] sm:text-xs">벨</span>
+        </div>
+        <!-- Time & Weather -->
+        <div class="flex items-center gap-1 bg-[#d3e3a4] px-2.5 py-1 rounded-full border-2 border-[#8ba352] text-[#3b5212] font-semibold text-[11px] sm:text-sm">
+          <span id="time-icon">☀️</span>
+          <span id="time-display">낮 12:00</span>
+          <span id="weather-display" class="hidden sm:inline">☀️ 맑음</span>
+        </div>
+        <!-- Poison Status Indicator -->
+        <div id="status-debuff" class="hidden flex items-center gap-1 bg-red-200 border-2 border-red-500 text-red-900 px-2 py-0.5 rounded-full text-[10px] sm:text-xs font-bold animate-pulse">
+          <span>🐝 벌/독 <span id="poison-count-text">1</span>회 중첩 (속도 <span id="poison-speed-text">50</span>%)</span>
+        </div>
+      </div>
+
+      <!-- Action Nav Buttons -->
+      <div class="flex items-center gap-1 sm:gap-2">
+        <button id="btn-inventory" class="btn-wood px-2 py-1 sm:px-2.5 sm:py-1.5 rounded-xl font-bold text-xs sm:text-sm flex items-center gap-1">
+          🎒 <span class="hidden md:inline">가방 (I)</span>
+        </button>
+        <button id="btn-craft" class="btn-wood px-2 py-1 sm:px-2.5 sm:py-1.5 rounded-xl font-bold text-xs sm:text-sm bg-orange-600 border-orange-800 flex items-center gap-1">
+          🔨 <span class="hidden md:inline">DIY 제작 (C)</span>
+        </button>
+        <button id="btn-museum" class="btn-wood px-2 py-1 sm:px-2.5 sm:py-1.5 rounded-xl font-bold text-xs sm:text-sm bg-emerald-700 border-emerald-900 flex items-center gap-1">
+          🏛️ <span class="hidden md:inline">박물관 (M)</span>
+        </button>
+        <button id="btn-shop" class="btn-wood px-2 py-1 sm:px-2.5 sm:py-1.5 rounded-xl font-bold text-xs sm:text-sm bg-amber-600 border-amber-800 flex items-center gap-1">
+          🏪 <span class="hidden md:inline">상점 (E)</span>
+        </button>
+        <button id="btn-audio" class="bg-[#d2c29d] hover:bg-[#c2b088] text-[#5c3a1b] p-1 sm:p-1.5 rounded-xl border-2 border-[#8b5a2b] text-xs">
+          🔊
+        </button>
+      </div>
+    </div>
+
+    <!-- Main Game Canvas Container -->
+    <div class="relative border-4 border-t-0 border-[#8b5a2b] rounded-b-2xl overflow-hidden shadow-2xl bg-[#599632] w-full">
+      <canvas id="gameCanvas" width="900" height="560" class="w-full h-auto max-w-[900px] block"></canvas>
+      
+      <!-- Action Hover Prompt -->
+      <div id="action-prompt" class="absolute hidden bg-white/95 text-[#5c3a1b] font-bold text-xs sm:text-sm px-3 py-1.5 rounded-full border-2 border-[#8b5a2b] shadow-lg transition-all transform -translate-x-1/2 pointer-events-none animate-bounce z-20">
+        <span id="action-text">Space/버튼: 동작</span>
+      </div>
+
+      <!-- Touch Screen Controls for Mobile -->
+      <div class="absolute bottom-3 left-3 flex flex-col gap-1 z-20 select-none">
+        <div class="flex justify-center">
+          <button id="touch-up" class="touch-btn w-11 h-11 text-xl">▲</button>
+        </div>
+        <div class="flex gap-2">
+          <button id="touch-left" class="touch-btn w-11 h-11 text-xl">◀</button>
+          <button id="touch-down" class="touch-btn w-11 h-11 text-xl">▼</button>
+          <button id="touch-right" class="touch-btn w-11 h-11 text-xl">▶</button>
+        </div>
+      </div>
+
+      <div class="absolute bottom-3 right-3 z-20 select-none">
+        <button id="touch-action" class="touch-btn w-16 h-16 text-sm font-bold bg-amber-200 border-amber-800 text-amber-950 rounded-full flex flex-col items-center justify-center shadow-lg active:scale-95">
+          <span class="text-xl">✨</span>
+          <span>동작</span>
+        </button>
+      </div>
+
+      <!-- Controls Info Bar -->
+      <div class="absolute top-2 left-2 flex justify-between items-center pointer-events-none z-10">
+        <div id="location-badge" class="bg-amber-100/90 text-amber-900 font-bold text-[11px] sm:text-xs px-2.5 py-1 rounded-lg border border-amber-800 shadow">
+          🏝️ 힐링 미니 섬 (⛏️ 광산 구역 추가)
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- MINING RHYTHM GAME MODAL -->
+  <div id="mining-modal" class="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center hidden z-50 p-4">
+    <div class="wood-panel w-full max-w-md p-5 flex flex-col items-center text-center relative">
+      <h2 class="text-xl font-bold text-[#5c3a1b] mb-1">⛏️ 신비한 광산 채굴 타이밍!</h2>
+      <p class="text-xs text-[#8c6b43] mb-4">게이지가 <span class="text-emerald-700 font-bold">녹색 Zone</span>에 맞춰졌을 때 [채굴!] 버튼이나 Space를 누르세요!</p>
+
+      <!-- Rhythm Bar -->
+      <div class="relative w-full h-10 bg-slate-300 border-4 border-[#8b5a2b] rounded-full overflow-hidden mb-6 shadow-inner">
+        <!-- Target Success Zone (Green) -->
+        <div id="rhythm-target-zone" class="absolute h-full bg-emerald-500 border-x-2 border-emerald-800" style="left: 40%; width: 20%;"></div>
+        <!-- Moving Indicator Bar -->
+        <div id="rhythm-pointer" class="absolute top-0 bottom-0 w-3 bg-red-600 border border-white rounded-full shadow-lg transform -translate-x-1/2"></div>
+      </div>
+
+      <button id="btn-strike-mine" class="btn-wood w-full py-3 rounded-2xl text-lg font-bold bg-amber-600 border-amber-800 shadow-lg">
+        ⛏️ 채굴하기! (HIT)
+      </button>
+    </div>
+  </div>
+
+  <!-- INVENTORY & FASHION WARDROBE MODAL -->
+  <div id="inventory-modal" class="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center hidden z-50 p-3">
+    <div class="wood-panel w-full max-w-2xl p-4 flex flex-col max-h-[90vh]">
+      <div class="flex justify-between items-center border-b-2 border-[#b89868] pb-2 mb-2">
+        <h2 class="text-lg sm:text-xl font-bold text-[#5c3a1b] flex items-center gap-2">🎒 주머니 & 착용 장비</h2>
+        <button id="close-inventory" class="text-gray-500 hover:text-red-500 font-bold text-xl px-2">✕</button>
+      </div>
+
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-3 overflow-y-auto pr-1">
+        <!-- Equipped Wardrobe & Tools -->
+        <div class="bg-[#f0e3c4] border-2 border-[#a67c42] rounded-xl p-2.5 flex flex-col items-center">
+          <h3 class="font-bold text-[#5c3a1b] mb-1 text-xs sm:text-sm">👕 현재 장착 코디/도구</h3>
+          
+          <div class="w-20 h-20 bg-[#d8c499] rounded-2xl border-2 border-[#8b5a2b] flex flex-col items-center justify-center relative mb-2">
+            <span id="equipped-hat-icon" class="text-2xl absolute top-1">🧢</span>
+            <span id="equipped-top-icon" class="text-2xl absolute bottom-1">👕</span>
+          </div>
+
+          <div class="w-full space-y-1 text-[11px]">
+            <div class="flex justify-between bg-white/60 p-1 rounded border border-[#a67c42]">
+              <span class="text-gray-600">모자:</span>
+              <span id="equipped-hat-name" class="font-bold text-amber-900">기본 캡</span>
+            </div>
+            <div class="flex justify-between bg-white/60 p-1 rounded border border-[#a67c42]">
+              <span class="text-gray-600">의상:</span>
+              <span id="equipped-top-name" class="font-bold text-amber-900">빨간 티셔츠</span>
+            </div>
+            <div class="flex justify-between bg-white/60 p-1 rounded border border-[#a67c42]">
+              <span class="text-gray-600">낚싯대:</span>
+              <span id="equipped-rod-name" class="font-bold text-amber-900">없음</span>
+            </div>
+            <div class="flex justify-between bg-white/60 p-1 rounded border border-[#a67c42]">
+              <span class="text-gray-600">잠자리채:</span>
+              <span id="equipped-net-name" class="font-bold text-amber-900">없음</span>
+            </div>
+            <div class="flex justify-between bg-white/60 p-1 rounded border border-[#a67c42]">
+              <span class="text-gray-600">삽:</span>
+              <span id="equipped-shovel-name" class="font-bold text-amber-900">없음</span>
+            </div>
+            <div class="flex justify-between bg-white/60 p-1 rounded border border-[#a67c42]">
+              <span class="text-gray-600">곡괭이:</span>
+              <span id="equipped-pickaxe-name" class="font-bold text-amber-900">없음</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Inventory Slots -->
+        <div class="md:col-span-2 flex flex-col">
+          <div id="inventory-grid" class="grid grid-cols-4 gap-1.5 overflow-y-auto max-h-[260px] p-1 flex-1">
+            <!-- Dynamic Inventory Slots -->
+          </div>
+          <p class="mt-1 text-[10px] text-[#8c6b43] text-center">* 의상/도구 클릭 시 장착! (도구가 있어야 활동 가능)</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- SHOP MODAL -->
+  <div id="shop-modal" class="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center hidden z-50 p-3">
+    <div class="wood-panel w-full max-w-xl p-4 flex flex-col max-h-[90vh]">
+      <div class="flex justify-between items-center border-b-2 border-[#b89868] pb-2 mb-2">
+        <div class="flex items-center gap-2">
+          <span class="text-2xl sm:text-3xl">🦝</span>
+          <div>
+            <h2 class="text-lg sm:text-xl font-bold text-[#5c3a1b]">너굴 만물상점</h2>
+            <p class="text-[10px] sm:text-xs text-[#8c6b43]">도구/곡괭이 구매 및 보석 판매 가능!</p>
+          </div>
+        </div>
+        <button id="close-shop" class="text-gray-500 hover:text-red-500 font-bold text-xl px-2">✕</button>
+      </div>
+
+      <!-- Tabs -->
+      <div class="flex gap-1 border-b-2 border-[#b89868] mb-2 text-xs">
+        <button id="tab-shop-tools" class="tab-btn tab-active">🛠️ 도구/곡괭이</button>
+        <button id="tab-shop-fashion" class="tab-btn tab-inactive">👑 패션 의상</button>
+        <button id="tab-shop-furniture" class="tab-btn tab-inactive">🛋️ 가구</button>
+        <button id="tab-shop-sell" class="tab-btn tab-inactive">💰 선택 판매</button>
+      </div>
+
+      <!-- Shop Content Area -->
+      <div id="shop-content-buy" class="space-y-1.5 overflow-y-auto flex-1 max-h-[280px] pr-1"></div>
+
+      <!-- Shop Sell Area -->
+      <div id="shop-content-sell" class="hidden flex-1 flex flex-col justify-between">
+        <div class="flex justify-between items-center mb-1 px-1 text-xs text-amber-900 font-bold">
+          <span>팔고 싶은 아이템 체크!</span>
+          <button id="btn-toggle-select-all" class="text-blue-700 underline text-[10px]">전체 선택/해제</button>
+        </div>
+        <div id="sell-list" class="space-y-1 overflow-y-auto max-h-[180px] pr-1"></div>
+        <div class="mt-2 pt-2 border-t-2 border-[#b89868] flex justify-between items-center">
+          <div>
+            <span class="text-xs text-gray-600">선택 판매 합계:</span>
+            <span id="sell-total-price" class="text-base sm:text-lg font-bold text-amber-900 ml-1">0 벨</span>
+          </div>
+          <button id="btn-sell-selected" class="btn-wood px-3 py-1.5 font-bold rounded-xl text-xs sm:text-sm">선택한 품목 팔기!</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- MUSEUM MODAL -->
+  <div id="museum-modal" class="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center hidden z-50 p-3">
+    <div class="wood-panel w-full max-w-2xl p-4 flex flex-col max-h-[90vh]">
+      <div class="flex justify-between items-center border-b-2 border-[#b89868] pb-2 mb-2">
+        <div class="flex items-center gap-2">
+          <span class="text-2xl sm:text-3xl">🦉</span>
+          <div>
+            <h2 class="text-lg sm:text-xl font-bold text-[#5c3a1b]">부엉의 섬 박물관</h2>
+            <p class="text-[10px] sm:text-xs text-[#8c6b43]">100종 생물 & 50종 화석 실물 도감 컬렉션!</p>
+          </div>
+        </div>
+        <button id="close-museum" class="text-gray-500 hover:text-red-500 font-bold text-xl px-2">✕</button>
+      </div>
+
+      <div class="flex gap-1 border-b-2 border-[#b89868] mb-2 text-xs">
+        <button id="tab-museum-fish" class="tab-btn tab-active">🐟 물고기 (<span id="count-fish">0</span>/100)</button>
+        <button id="tab-museum-bugs" class="tab-btn tab-inactive">🦋 곤충 (<span id="count-bugs">0</span>/100)</button>
+        <button id="tab-museum-fossils" class="tab-btn tab-inactive">🦴 화석 (<span id="count-fossils">0</span>/50)</button>
+      </div>
+
+      <div id="museum-grid" class="grid grid-cols-2 sm:grid-cols-4 gap-1.5 overflow-y-auto max-h-[300px] p-1 flex-1">
+        <!-- Museum Collection Cards -->
+      </div>
+      
+      <div class="mt-2 pt-2 border-t-2 border-[#b89868] flex justify-between items-center">
+        <span class="text-[10px] sm:text-xs text-amber-800">* 박물관 건물 근처에서 [Space]/[동작] 누르면 보유 항목 자동 기증!</span>
+        <button id="btn-donate-all" class="btn-wood px-2.5 py-1 font-bold rounded-xl text-xs bg-emerald-600 border-emerald-800">모두 기증</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- DIY CRAFTING BENCH MODAL -->
+  <div id="craft-modal" class="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center hidden z-50 p-3">
+    <div class="wood-panel w-full max-w-xl p-4 flex flex-col max-h-[85vh]">
+      <div class="flex justify-between items-center border-b-2 border-[#b89868] pb-2 mb-2">
+        <div class="flex items-center gap-2">
+          <span class="text-2xl sm:text-3xl">🔨</span>
+          <div>
+            <h2 class="text-lg sm:text-xl font-bold text-[#5c3a1b]">계단식 계층 DIY 제작 작업대</h2>
+            <p class="text-[10px] sm:text-xs text-[#8c6b43]">곡괭이/고급 도구 & 루비/사파이어/에메랄드 세공 가구!</p>
+          </div>
+        </div>
+        <button id="close-craft" class="text-gray-500 hover:text-red-500 font-bold text-xl px-2">✕</button>
+      </div>
+
+      <div id="crafting-list" class="space-y-1.5 overflow-y-auto max-h-[280px] pr-1">
+        <!-- Recipes dynamically rendered -->
+      </div>
+    </div>
+  </div>
+
+  <script>
+    /* ==========================================
+       AUDIO SYNTHESIZER
+       ========================================== */
+    class SoundEffects {
+      constructor() {
+        this.ctx = null;
+        this.muted = false;
+      }
+      init() {
+        if (!this.ctx) this.ctx = new (window.AudioContext || window.webkitAudioContext)();
+      }
+      playTone(freq, type, duration, gainVal = 0.1) {
+        if (this.muted || !this.ctx) return;
+        try {
+          const osc = this.ctx.createOscillator();
+          const gain = this.ctx.createGain();
+          osc.type = type;
+          osc.frequency.setValueAtTime(freq, this.ctx.currentTime);
+          gain.gain.setValueAtTime(gainVal, this.ctx.currentTime);
+          gain.gain.exponentialRampToValueAtTime(0.0001, this.ctx.currentTime + duration);
+          osc.connect(gain);
+          gain.connect(this.ctx.destination);
+          osc.start();
+          osc.stop(this.ctx.currentTime + duration);
+        } catch(e){}
+      }
+      pickup() {
+        this.init();
+        this.playTone(523, 'sine', 0.1, 0.15);
+        setTimeout(() => this.playTone(659, 'sine', 0.1, 0.15), 50);
+        setTimeout(() => this.playTone(783, 'sine', 0.2, 0.15), 100);
+      }
+      fanfare() {
+        this.init();
+        const notes = [523, 659, 783, 1046];
+        notes.forEach((n, i) => setTimeout(() => this.playTone(n, 'triangle', 0.25, 0.2), i * 80));
+      }
+      splash() {
+        this.init();
+        this.playTone(180, 'triangle', 0.3, 0.2);
+        this.playTone(320, 'sine', 0.2, 0.1);
+      }
+      shake() {
+        this.init();
+        this.playTone(120, 'square', 0.08, 0.1);
+        setTimeout(() => this.playTone(90, 'square', 0.08, 0.1), 40);
+      }
+      coins() {
+        this.init();
+        this.playTone(987, 'sine', 0.08, 0.15);
+        setTimeout(() => this.playTone(1318, 'sine', 0.2, 0.2), 70);
+      }
+      equip() {
+        this.init();
+        this.playTone(440, 'sine', 0.1, 0.15);
+        setTimeout(() => this.playTone(880, 'sine', 0.15, 0.15), 60);
+      }
+      beeAttack() {
+        this.init();
+        this.playTone(150, 'sawtooth', 0.4, 0.2);
+      }
+      breakTool() {
+        this.init();
+        this.playTone(300, 'sawtooth', 0.1, 0.3);
+        setTimeout(() => this.playTone(150, 'sawtooth', 0.25, 0.3), 80);
+      }
+      sleep() {
+        this.init();
+        this.playTone(330, 'sine', 0.3, 0.1);
+        setTimeout(() => this.playTone(440, 'sine', 0.3, 0.1), 250);
+        setTimeout(() => this.playTone(554, 'sine', 0.5, 0.1), 500);
+      }
+      mineHit() {
+        this.init();
+        this.playTone(800, 'triangle', 0.1, 0.25);
+        setTimeout(() => this.playTone(1200, 'sine', 0.2, 0.25), 50);
+      }
+    }
+    const sfx = new SoundEffects();
+
+    /* ==========================================
+       AUTHENTIC REAL-WORLD DATABASE
+       ========================================== */
+    const REAL_FOSSILS = [
+      "삼엽충", "암모나이트", "호박", "시조새", "공룡 알", "티라노사우루스 머리", "티라노사우루스 몸통", "티라노사우루스 꼬리",
+      "트리케라톱스 머리", "트리케라톱스 몸통", "트리케라톱스 꼬리", "브라키오사우루스 머리", "브라키오사우루스 가슴", "브라키오사우루스 꼬리",
+      "스테고사우루스 머리", "스테고사우루스 몸통", "스테고사우루스 꼬리", "프테라노돈 머리", "프테라노돈 오른날개", "프테라노돈 왼날개",
+      "매머드 머리", "매머드 몸통", "스밀로돈 머리", "스밀로돈 몸통", "메갈로세로스 오른쪽 뿔", "메갈로세로스 왼쪽 뿔", "아르켈론 머리", "아르켈론 몸통",
+      "안킬로사우루스 머리", "안킬로사우루스 몸통", "안킬로사우루스 꼬리", "파키케팔로사우루스 머리", "파키케팔로사우루스 몸통", "스피노사우루스 머리",
+      "스피노사우루스 몸통", "스피노사우루스 꼬리", "이구아노돈 머리", "이구아노돈 몸통", "이구아노돈 꼬리", "플레시오사우루스 머리",
+      "플레시오사우루스 몸통", "플레시오사우루스 꼬리", "디플로도쿠스 머리", "디플로도쿠스 목", "디플로도쿠스 몸통", "디플로도쿠스 꼬리",
+      "던클레오스테우스", "오스트랄로피테쿠스", "메갈로돈 이빨", "공룡 발자국"
+    ];
+
+    const REAL_BUGS_NAMES = [
+      "배추나비", "노랑나비", "호랑나비", "제비나비", "왕나비", "몰포나비", "아그리아스나비", "알렉산드라비단제비나비", "장수풍뎅이", "왕사슴벌레",
+      "톱사슴벌레", "사슴벌레", "애사슴벌레", "황금사슴벌레", "헤라클레스장수풍뎅이", "코카서스장수풍뎅이", "엘라파스장수풍뎅이", "조우코끼리장수풍뎅이", "타란툴라", "전갈",
+      "꿀벌", "서양벌", "장수말벌", "방아깨비", "섬서구날개매미", "여치", "귀뚜라미", "왕귀뚜라미", "유지매미", "참매미",
+      "애매미", "쓰름매미", "곰매미", "고추잠자리", "장수잠자리", "왕잠자리", "소금쟁이", "물방개", "물장군", "길대벌레",
+      "잎사귀벌레", "달팽이", "공벌레", "지렁이", "지네", "돈벌레", "노린재", "무당벌레", "칠성무당벌레", "반딧불이",
+      "풍뎅이", "비단벌레", "로살리아비단벌레", "알키데스사슴벌레", "기라파톱사슴벌레", "메탈리퍼사슴벌레", "람프리마사슴벌레", "원왕사슴벌레", "뮤엘러리사슴벌레", "악테온장수풍뎅이",
+      "네프튠장수풍뎅이", "새턴장수풍뎅이", "오니스구슬벌레", "보라금풍뎅이", "왕풍뎅이", "사마귀", "왕사마귀", "넓적배사마귀", "꽃사마귀", "난초사마귀",
+      "대왕대벌레", "대벌레", "풀무치", "벼룩", "벼룩파리", "초파리", "모기", "집파리", "등에", "꽃등에",
+      "개미", "가시개미", "불개미", "군대개미", "잎꾼개미", "흰개미", "옷좀나방", "누에나방", "박각시나방", "옥색아틀라스나방",
+      "자방나방", "자나방", "알락나방", "집게벌레", "벼룩잎벌레", "소나무비단벌레", "거미", "호랑거미", "무당거미", "깡충거미"
+    ];
+
+    const REAL_FISH_NAMES = [
+      "송사리", "붕어", "떡붕어", "피라미", "갈겨니", "황어", "잉어", "비단잉어", "금붕어", "툭눈금붕어",
+      "난주", "메기", "동자개", "빠가사리", "꺽지", "쏘가리", "큰입배스", "블루길", "가물치", "은어",
+      "빙어", "산천어", "열목어", "무지개송어", "금송어", "연어", "왕연어", "곱등어", "자라", "늑대고기",
+      "피라루쿠", "아로와나", "실버아로와나", "엘리게이터가아", "가아", "폴립테루스", "피라니아", "네온테트라", "구피", "엔젤피시",
+      "베타", "디스커스", "클라운피시", "블루탱", "나비고기", "가시복", "복어", "쥐치", "넙치", "가자미",
+      "도미", "돌돔", "감성돔", "혹돔", "농어", "점농어", "부리", "방어", "부시리", "삼치", "고등어",
+      "전갱이", "꽁치", "정어리", "갈치", "산갈치", "아구", "초롱아귀", "축구공물고기", "데메니기", "실러캔스",
+      "만새기", "새치", "청새치", "황새치", "돛새치", "다랑어", "참다랑어", "눈다랑어", "황다랑어", "날개다랑어",
+      "개와라성어", "참돔", "옥돔", "우럭", "볼락", "열기", "쥐노래미", "광어", "대구", "명태",
+      "아귀", "쏠종개", "쏠배감펭", "해마", "가오리", "만타가오리", "고래상어", "귀상어", "청상아리", "백상아리"
+    ];
+
+    // Master Items Database
+    const ITEM_DB = {
+      // Wood & Basic Materials
+      wood: { name: '목재', icon: '🪵', price: 60, type: 'material' },
+      softwood: { name: '부드러운 목재', icon: '🪵', price: 60, type: 'material' },
+      hardwood: { name: '단단한 목재', icon: '🪵', price: 60, type: 'material' },
+      iron: { name: '철광석', icon: '🪨', price: 300, type: 'material' },
+      gold_nugget: { name: '금광석', icon: '✨', price: 3000, type: 'material' },
+
+      // Gemstones (NEW)
+      ruby: { name: '루비', icon: '❤️', price: 8000, type: 'material' },
+      sapphire: { name: '사파이어', icon: '💙', price: 10000, type: 'material' },
+      emerald: { name: '에메랄드', icon: '💚', price: 12000, type: 'material' },
+
+      // Fruits
+      apple: { name: '사과', icon: '🍎', price: 100, type: 'fruit' },
+      pear: { name: '배', icon: '🍐', price: 100, type: 'fruit' },
+      cherry: { name: '체리', icon: '🍒', price: 100, type: 'fruit' },
+      orange: { name: '오렌지', icon: '🍊', price: 100, type: 'fruit' },
+      peach: { name: '복숭아', icon: '🍑', price: 100, type: 'fruit' },
+      coconut: { name: '야자열매', icon: '🥥', price: 250, type: 'fruit' },
+
+      // Fashion Items
+      hat_cap: { name: '기본 캡', icon: '🧢', price: 300, type: 'hat' },
+      hat_straw: { name: '밀짚모자', icon: '👒', price: 800, type: 'hat' },
+      hat_crown: { name: '황금 왕관', icon: '👑', price: 12000, type: 'hat' },
+      hat_frog: { name: '개구리 모자', icon: '🐸', price: 2500, type: 'hat' },
+      hat_pirate: { name: '해적 모자', icon: '🏴‍☠️', price: 4500, type: 'hat' },
+
+      top_red: { name: '빨간 티셔츠', icon: '👕', price: 300, type: 'top', color: '#ff6b6b' },
+      top_tuxedo: { name: '신사 턱시도', icon: '👔', price: 3500, type: 'top', color: '#2d3436' },
+      top_sailor: { name: '세일러복', icon: '⚓', price: 1800, type: 'top', color: '#0984e3' },
+      top_royal: { name: '왕족 로브', icon: '🥋', price: 8500, type: 'top', color: '#6c5ce7' },
+      top_hawaiian: { name: '하와이안 셔츠', icon: '🌺', price: 2200, type: 'top', color: '#fdcb6e' },
+
+      // Tools Tier Progression Items
+      tool_rod_1: { name: '엉성한 낚싯대', icon: '🎣', price: 400, type: 'tool_rod', tier: 1, breakChance: 0.15 },
+      tool_rod_2: { name: '튼튼한 낚싯대', icon: '🎣', price: 2500, type: 'tool_rod', tier: 2, breakChance: 0.03 },
+      tool_rod_3: { name: '황금 낚싯대', icon: '✨', price: 25000, type: 'tool_rod', tier: 3, breakChance: 0.005 },
+
+      tool_net_1: { name: '엉성한 잠자리채', icon: '🕸️', price: 400, type: 'tool_net', tier: 1, breakChance: 0.15 },
+      tool_net_2: { name: '튼튼한 잠자리채', icon: '🕸️', price: 2500, type: 'tool_net', tier: 2, breakChance: 0.03 },
+      tool_net_3: { name: '황금 잠자리채', icon: '✨', price: 25000, type: 'tool_net', tier: 3, breakChance: 0.005 },
+
+      tool_shovel_1: { name: '엉성한 삽', icon: '⛏️', price: 400, type: 'tool_shovel', tier: 1, breakChance: 0.15 },
+      tool_shovel_2: { name: '튼튼한 삽', icon: '⛏️', price: 2500, type: 'tool_shovel', tier: 2, breakChance: 0.03 },
+      tool_shovel_3: { name: '황금 삽', icon: '✨', price: 25000, type: 'tool_shovel', tier: 3, breakChance: 0.005 },
+
+      // Pickaxes (NEW)
+      tool_pickaxe_1: { name: '엉성한 곡괭이', icon: '⛏️', price: 500, type: 'tool_pickaxe', tier: 1, breakChance: 0.15 },
+      tool_pickaxe_2: { name: '튼튼한 곡괭이', icon: '⛏️', price: 3000, type: 'tool_pickaxe', tier: 2, breakChance: 0.03 },
+      tool_pickaxe_3: { name: '황금 곡괭이', icon: '✨', price: 30000, type: 'tool_pickaxe', tier: 3, breakChance: 0.005 },
+
+      // Furnitures & Gem Crafts
+      furniture_bed: { name: '통나무 침대', icon: '🛏️', price: 2000, type: 'furniture', tier: 1 },
+      furniture_sofa: { name: '폭신한 소파', icon: '🛋️', price: 3200, type: 'furniture', tier: 2 },
+      furniture_tv: { name: 'LCD TV', icon: '📺', price: 8800, type: 'furniture', tier: 2 },
+      furniture_throne: { name: '황금 왕좌', icon: '🏰', price: 50000, type: 'furniture', tier: 3 },
+      furniture_plant: { name: '관엽 식물', icon: '🪴', price: 1200, type: 'furniture', tier: 1 },
+
+      // Gemstone Masterpieces
+      jewel_ring: { name: '황금 루비 반지', icon: '💍', price: 35000, type: 'furniture', tier: 3 },
+      jewel_tiara: { name: '사파이어 황가 티아라', icon: '👑', price: 48000, type: 'hat', tier: 3 },
+      jewel_statue: { name: '에메랄드 대형 조각상', icon: '🗿', price: 65000, type: 'furniture', tier: 3 }
+    };
+
+    // Populate Fish/Bugs/Fossils Databases
+    const FISH_DATA = [];
+    REAL_FISH_NAMES.forEach((name, idx) => {
+      const id = `fish_${idx}`;
+      const isUltra = idx === 69 || idx === 72 || idx === 99;
+      const price = isUltra ? 15000 : Math.floor(200 + (idx * 160));
+      const icon = idx > 90 ? '🦈' : (idx % 3 === 0 ? '🐠' : '🐟');
+      const biteTime = Math.max(12, 70 - Math.floor(idx * 0.5));
+      const fishObj = { name, icon, price, biteTime, dbIdx: idx };
+      FISH_DATA.push(fishObj);
+      ITEM_DB[id] = { name, icon, price, type: 'fish', biteTime, dbIdx: idx };
+    });
+
+    const BUGS_DATA = [];
+    REAL_BUGS_NAMES.forEach((name, idx) => {
+      const id = `bug_${idx}`;
+      const price = Math.floor(180 + (idx * 150));
+      const icon = idx === 18 || idx === 19 ? '🦂' : (idx % 2 === 0 ? '🦋' : '🪲');
+      const speed = 0.8 + (idx * 0.05);
+      const bugObj = { name, icon, price, speed, dbIdx: idx };
+      BUGS_DATA.push(bugObj);
+      ITEM_DB[id] = { name, icon, price, type: 'bug', speed, dbIdx: idx };
+    });
+
+    REAL_FOSSILS.forEach((name, idx) => {
+      const id = `fossil_${idx}`;
+      ITEM_DB[id] = { name: `${name} 화석`, icon: '🦴', price: 1200 + (idx * 300), type: 'fossil', dbIdx: idx };
+    });
+
+    /* ==========================================
+       GAME STATE & ENGINE
+       ========================================== */
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d');
+
+    const WORLD_WIDTH = 1600;
+    const WORLD_HEIGHT = 1100;
+
+    let gameTime = 12 * 60; // 12:00 PM
+    let isRaining = false;
+
+    // Player Object
+    const player = {
+      x: 800,
+      y: 600,
+      baseSpeed: 4.0,
+      dir: 'down',
+      isMoving: false,
+      animFrame: 0,
+      animTimer: 0,
+      bells: 3500,
+      inventory: ['apple', 'wood', 'softwood', 'hat_straw', 'top_hawaiian'],
+      equipped: {
+        hat: 'hat_cap',
+        top: 'top_red',
+        rod: null,
+        net: null,
+        shovel: null,
+        pickaxe: null
+      },
+      houseUpgrade: 0,
+      poisonStungCount: 0, // Cumulative poison stacks!
+      isTrapped: false,
+      trappedTimer: 0
+    };
+
+    // Museum Donations State
+    const museumDonations = {
+      fish: new Set(),
+      bugs: new Set(),
+      fossils: new Set()
+    };
+
+    // Map Entities & Interior State
+    let currentMap = 'island';
+    const houseInteriorFurniture = [
+      { id: 'furniture_bed', x: 250, y: 180 },
+      { id: 'furniture_plant', x: 620, y: 180 }
+    ];
+
+    let trees = [];
+    let bugs = [];
+    let fossils = [];
+    let floatingTexts = [];
+
+    // Map Buildings & Mining Zone Coordinates
+    const shopBuilding = { x: 950, y: 350, width: 100, height: 85 };
+    const museumBuilding = { x: 1150, y: 350, width: 110, height: 90 };
+    const playerHouse = { x: 550, y: 350, width: 90, height: 80 };
+    const craftBenchObj = { x: 700, y: 400, width: 50, height: 40 };
+    const mineZoneObj = { x: 1350, y: 180, width: 150, height: 120 };
+
+    // Keyboard & Mobile Touch Controls Inputs
+    const keys = {};
+    const touchKeys = { up: false, down: false, left: false, right: false };
+
+    window.addEventListener('keydown', (e) => {
+      keys[e.key.toLowerCase()] = true;
+      if ([' ', 'i', 'e', 'm', 'c'].includes(e.key.toLowerCase())) {
+        if (document.activeElement.tagName !== 'INPUT') e.preventDefault();
+      }
+      if (e.key.toLowerCase() === 'i') toggleModal('inventory-modal');
+      if (e.key.toLowerCase() === 'e') toggleModal('shop-modal');
+      if (e.key.toLowerCase() === 'm') toggleModal('museum-modal');
+      if (e.key.toLowerCase() === 'c') toggleModal('craft-modal');
+      if (e.key === ' ') handleInteraction();
+    });
+    window.addEventListener('keyup', (e) => { keys[e.key.toLowerCase()] = false; });
+
+    // Touch D-Pad Events setup
+    function setupTouchControl(id, dirKey) {
+      const btn = document.getElementById(id);
+      btn.addEventListener('touchstart', (e) => { e.preventDefault(); touchKeys[dirKey] = true; });
+      btn.addEventListener('touchend', (e) => { e.preventDefault(); touchKeys[dirKey] = false; });
+      btn.addEventListener('mousedown', () => { touchKeys[dirKey] = true; });
+      btn.addEventListener('mouseup', () => { touchKeys[dirKey] = false; });
+    }
+    setupTouchControl('touch-up', 'up');
+    setupTouchControl('touch-down', 'down');
+    setupTouchControl('touch-left', 'left');
+    setupTouchControl('touch-right', 'right');
+
+    const touchActionBtn = document.getElementById('touch-action');
+    touchActionBtn.addEventListener('click', () => handleInteraction());
+    touchActionBtn.addEventListener('touchstart', (e) => { e.preventDefault(); handleInteraction(); });
+
+    /* ==========================================
+       INITIALIZATION & MAP GENERATION
+       ========================================== */
+    function initWorld() {
+      trees = [];
+      bugs = [];
+      fossils = [];
+
+      const fruitList = ['apple', 'pear', 'cherry', 'orange', 'peach', 'coconut'];
+      for (let i = 0; i < 35; i++) {
+        let tx = Math.random() * (WORLD_WIDTH - 300) + 120;
+        let ty = Math.random() * (WORLD_HEIGHT - 350) + 120;
+        if (ty > 800 || (tx > 450 && tx < 1500 && ty < 500)) continue;
+
+        trees.push({
+          x: tx, y: ty,
+          radius: 24,
+          fruit: fruitList[Math.floor(Math.random() * fruitList.length)],
+          hasFruit: true,
+          respawnTimer: 0
+        });
+      }
+
+      for (let i = 0; i < 14; i++) spawnFossil();
+      for (let i = 0; i < 12; i++) spawnBug();
+
+      isRaining = Math.random() < 0.3;
+      updateWeatherDisplay();
+    }
+
+    function spawnFossil() {
+      fossils.push({
+        x: Math.random() * (WORLD_WIDTH - 350) + 150,
+        y: Math.random() * (WORLD_HEIGHT - 400) + 150
+      });
+    }
+
+    function spawnBug() {
+      const randomIdx = Math.floor(Math.random() * BUGS_DATA.length);
+      bugs.push({
+        x: Math.random() * (WORLD_WIDTH - 300) + 120,
+        y: Math.random() * (WORLD_HEIGHT - 400) + 120,
+        dbIdx: randomIdx,
+        vx: (Math.random() - 0.5) * BUGS_DATA[randomIdx].speed * 2,
+        vy: (Math.random() - 0.5) * BUGS_DATA[randomIdx].speed * 2
+      });
+    }
+
+    function updateWeatherDisplay() {
+      document.getElementById('weather-display').innerText = isRaining ? '🌧️ 비' : '☀️ 맑음';
+    }
+
+    /* ==========================================
+       MINING RHYTHM GAME LOGIC
+       ========================================== */
+    const miningRhythm = {
+      active: false,
+      pointerPos: 0, // 0 to 100%
+      direction: 1, // 1 or -1
+      speed: 2.2,
+      targetStart: 40,
+      targetWidth: 20,
+      animationFrameId: null
+    };
+
+    function startMiningRhythmGame() {
+      if (!player.equipped.pickaxe) {
+        showFloatingText("곡괭이를 장착해야 채굴이 가능합니다! (상점/DIY)", player.x, player.y - 35, '#f87171');
+        return;
+      }
+
+      miningRhythm.active = true;
+      miningRhythm.pointerPos = 0;
+      miningRhythm.direction = 1;
+      miningRhythm.targetStart = Math.random() * 50 + 20; // 20% to 70%
+      
+      const pickaxe = ITEM_DB[player.equipped.pickaxe];
+      // Higher tier pickaxe = wider success zone
+      miningRhythm.targetWidth = pickaxe.tier === 3 ? 30 : (pickaxe.tier === 2 ? 22 : 15);
+      miningRhythm.speed = pickaxe.tier === 3 ? 1.8 : 2.5;
+
+      const zone = document.getElementById('rhythm-target-zone');
+      zone.style.left = `${miningRhythm.targetStart}%`;
+      zone.style.width = `${miningRhythm.targetWidth}%`;
+
+      document.getElementById('mining-modal').classList.remove('hidden');
+      loopMiningRhythm();
+    }
+
+    function loopMiningRhythm() {
+      if (!miningRhythm.active) return;
+
+      miningRhythm.pointerPos += miningRhythm.speed * miningRhythm.direction;
+      if (miningRhythm.pointerPos >= 100) {
+        miningRhythm.pointerPos = 100;
+        miningRhythm.direction = -1;
+      } else if (miningRhythm.pointerPos <= 0) {
+        miningRhythm.pointerPos = 0;
+        miningRhythm.direction = 1;
+      }
+
+      const pointerEl = document.getElementById('rhythm-pointer');
+      pointerEl.style.left = `${miningRhythm.pointerPos}%`;
+
+      miningRhythm.animationFrameId = requestAnimationFrame(loopMiningRhythm);
+    }
+
+    function strikeMiningHit() {
+      if (!miningRhythm.active) return;
+
+      miningRhythm.active = false;
+      cancelAnimationFrame(miningRhythm.animationFrameId);
+      document.getElementById('mining-modal').classList.add('hidden');
+
+      const hitPos = miningRhythm.pointerPos;
+      const targetEnd = miningRhythm.targetStart + miningRhythm.targetWidth;
+
+      const currentPickaxe = player.equipped.pickaxe;
+
+      if (hitPos >= miningRhythm.targetStart && hitPos <= targetEnd) {
+        sfx.mineHit();
+        sfx.fanfare();
+
+        // Mining Drop Rewards! (Iron, Gold, Ruby, Sapphire, Emerald)
+        const rand = Math.random();
+        let dropped = 'iron';
+        if (rand < 0.08) dropped = 'emerald';
+        else if (rand < 0.18) dropped = 'sapphire';
+        else if (rand < 0.30) dropped = 'ruby';
+        else if (rand < 0.55) dropped = 'gold_nugget';
+
+        const item = ITEM_DB[dropped];
+        player.inventory.push(dropped);
+        showFloatingText(`🎯 PERFECT! ${item.name} ${item.icon} 채굴 성공!`, player.x, player.y - 40, '#22c55e');
+        updateInventoryUI();
+      } else {
+        sfx.shake();
+        showFloatingText("💥 빗나갔다! (채굴 실패)", player.x, player.y - 35, '#ef4444');
+      }
+
+      checkToolBreakage(currentPickaxe, 'pickaxe');
+    }
+
+    document.getElementById('btn-strike-mine').onclick = () => strikeMiningHit();
+
+    /* ==========================================
+       TOOL BREAKAGE & DEBUFF HELPERS
+       ========================================== */
+    function checkToolBreakage(toolKey, toolType) {
+      const item = ITEM_DB[toolKey];
+      if (!item || !item.breakChance) return false;
+
+      if (Math.random() < item.breakChance) {
+        sfx.breakTool();
+        const idx = player.inventory.indexOf(toolKey);
+        if (idx !== -1) player.inventory.splice(idx, 1);
+        player.equipped[toolType] = null;
+        showFloatingText(`💥 ${item.name}이(가) 부러졌습니다!`, player.x, player.y - 45, '#ef4444');
+        updateInventoryUI();
+        return true;
+      }
+      return false;
+    }
+
+    /* ==========================================
+       FISHING SYSTEM
+       ========================================== */
+    const fishingState = {
+      active: false,
+      bobberX: 0, bobberY: 0,
+      stage: 'idle',
+      timer: 0,
+      fishDbIdx: null
+    };
+
+    function startFishing() {
+      if (!player.equipped.rod) {
+        showFloatingText("낚싯대를 먼저 장착해야 합니다! (가방: I)", player.x, player.y - 35, '#f87171');
+        return;
+      }
+
+      if (fishingState.active || currentMap !== 'island') return;
+
+      let bx = player.x, by = player.y;
+      if (player.dir === 'down') by += 50;
+      if (player.dir === 'up') by -= 40;
+      if (player.dir === 'left') bx -= 45;
+      if (player.dir === 'right') bx += 45;
+
+      if (by >= 830) {
+        fishingState.active = true;
+        fishingState.bobberX = bx;
+        fishingState.bobberY = by;
+        fishingState.stage = 'waiting';
+
+        if (isRaining && Math.random() < 0.3) {
+          fishingState.fishDbIdx = 69; // Coelacanth special
+        } else {
+          fishingState.fishDbIdx = Math.floor(Math.random() * FISH_DATA.length);
+        }
+
+        fishingState.timer = Math.floor(Math.random() * 160) + 80;
+        showFloatingText("찌를 던졌다!", player.x, player.y - 35, '#38bdf8');
+      } else {
+        showFloatingText("물가가 아닙니다!", player.x, player.y - 35, '#f87171');
+      }
+    }
+
+    function updateFishing() {
+      if (!fishingState.active) return;
+
+      if (fishingState.stage === 'waiting') {
+        fishingState.timer--;
+        if (fishingState.timer <= 0) {
+          fishingState.stage = 'nibble';
+          const fish = FISH_DATA[fishingState.fishDbIdx];
+          
+          const isGoldRod = player.equipped.rod === 'tool_rod_3';
+          const bonusTime = isGoldRod ? 35 : (player.equipped.rod === 'tool_rod_2' ? 18 : 0);
+          
+          fishingState.timer = fish.biteTime + bonusTime;
+          sfx.splash();
+        }
+      } else if (fishingState.stage === 'nibble') {
+        fishingState.timer--;
+        if (fishingState.timer <= 0) {
+          fishingState.active = false;
+          fishingState.fishDbIdx = null;
+          showFloatingText("도망쳤다...!", player.x, player.y - 35, '#94a3b8');
+        }
+      }
+    }
+
+    function catchFish() {
+      if (!fishingState.active) return false;
+
+      const currentRod = player.equipped.rod;
+
+      if (fishingState.stage === 'nibble') {
+        const itemKey = `fish_${fishingState.fishDbIdx}`;
+        const item = ITEM_DB[itemKey];
+        player.inventory.push(itemKey);
+        sfx.fanfare();
+        showFloatingText(`🎉 낚았다! ${item.name} ${item.icon}`, player.x, player.y - 40, '#facc15');
+        fishingState.active = false;
+        fishingState.fishDbIdx = null;
+        updateInventoryUI();
+
+        checkToolBreakage(currentRod, 'rod');
+        return true;
+      } else {
+        fishingState.active = false;
+        fishingState.fishDbIdx = null;
+        showFloatingText("너무 빨랐다!", player.x, player.y - 35, '#f87171');
+        return true;
+      }
+    }
+
+    /* ==========================================
+       INTERACTION HANDLER
+       ========================================== */
+    function handleInteraction() {
+      if (miningRhythm.active) {
+        strikeMiningHit();
+        return;
+      }
+
+      if (player.isTrapped) return;
+
+      if (fishingState.active) {
+        catchFish();
+        return;
+      }
+
+      // House Indoor Entrance/Exit & Bed Interaction
+      if (currentMap === 'island') {
+        const distHouse = Math.hypot(player.x - (playerHouse.x + playerHouse.width/2), player.y - (playerHouse.y + playerHouse.height));
+        if (distHouse < 45) {
+          currentMap = 'house';
+          player.x = 450; player.y = 480;
+          document.getElementById('location-badge').innerText = '🏠 나의 집 내부';
+          showFloatingText("집 안으로 들어왔다!", player.x, player.y - 35, '#facc15');
+          return;
+        }
+      } else if (currentMap === 'house') {
+        // Bed Sleep & Complete Cure
+        const bedObj = houseInteriorFurniture.find(f => f.id === 'furniture_bed');
+        if (bedObj && Math.hypot(player.x - bedObj.x, player.y - bedObj.y) < 55) {
+          sfx.sleep();
+          player.poisonStungCount = 0; // Reset all poison stacks!
+          document.getElementById('status-debuff').classList.add('hidden');
+          showFloatingText("😴 푹 쉬고 건강을 완치했다! (벌/독 완전 치료)", player.x, player.y - 35, '#4ade80');
+          return;
+        }
+
+        if (player.y > 500) {
+          currentMap = 'island';
+          player.x = playerHouse.x + playerHouse.width/2;
+          player.y = playerHouse.y + playerHouse.height + 20;
+          document.getElementById('location-badge').innerText = '🏝️ 힐링 미니 섬';
+          return;
+        }
+      }
+
+      if (currentMap !== 'island') return;
+
+      // Mine Zone Interaction
+      if (Math.hypot(player.x - (mineZoneObj.x + mineZoneObj.width/2), player.y - (mineZoneObj.y + mineZoneObj.height/2)) < 80) {
+        startMiningRhythmGame();
+        return;
+      }
+
+      // Crafting Bench
+      if (Math.hypot(player.x - craftBenchObj.x, player.y - craftBenchObj.y) < 55) {
+        toggleModal('craft-modal');
+        return;
+      }
+
+      // Shop Entrance
+      if (Math.hypot(player.x - (shopBuilding.x + shopBuilding.width/2), player.y - (shopBuilding.y + shopBuilding.height/2)) < 75) {
+        toggleModal('shop-modal');
+        return;
+      }
+
+      // Museum Entrance
+      const distMuseum = Math.hypot(player.x - (museumBuilding.x + museumBuilding.width/2), player.y - (museumBuilding.y + museumBuilding.height/2));
+      if (distMuseum < 80) {
+        donateAllItems();
+        toggleModal('museum-modal');
+        return;
+      }
+
+      // Trees Shaking
+      for (let tree of trees) {
+        if (Math.hypot(player.x - tree.x, player.y - tree.y) < 50) {
+          sfx.shake();
+          if (tree.hasFruit) {
+            tree.hasFruit = false;
+            tree.respawnTimer = 600;
+            player.inventory.push(tree.fruit);
+            showFloatingText(`+1 ${ITEM_DB[tree.fruit].name} ${ITEM_DB[tree.fruit].icon}`, tree.x, tree.y - 30, '#4ade80');
+          } else {
+            const rand = Math.random();
+            if (rand < 0.12) {
+              sfx.beeAttack();
+              player.poisonStungCount += 1; // Stack poison!
+              
+              const speedRatio = Math.max(12.5, 100 / Math.pow(2, player.poisonStungCount));
+              document.getElementById('status-debuff').classList.remove('hidden');
+              document.getElementById('poison-count-text').innerText = player.poisonStungCount;
+              document.getElementById('poison-speed-text').innerText = speedRatio.toFixed(1);
+
+              showFloatingText(`💥 또 벌에 쏘였다! (독 ${player.poisonStungCount}회 중첩! 속도 ${speedRatio.toFixed(1)}%)`, tree.x, tree.y - 30, '#ef4444');
+            } else if (rand < 0.25) {
+              player.bells += 300;
+              sfx.coins();
+              updateBellsUI();
+              showFloatingText("+300 벨 획득! 🔔", tree.x, tree.y - 30, '#facc15');
+            } else {
+              const woods = ['wood', 'softwood', 'hardwood'];
+              const droppedWood = woods[Math.floor(Math.random() * woods.length)];
+              player.inventory.push(droppedWood);
+              showFloatingText(`+1 ${ITEM_DB[droppedWood].name} ${ITEM_DB[droppedWood].icon}`, tree.x, tree.y - 30, '#a16207');
+            }
+          }
+          updateInventoryUI();
+          return;
+        }
+      }
+
+      // Catch Bugs (Requires Net Equipped)
+      for (let i = bugs.length - 1; i >= 0; i--) {
+        let bug = bugs[i];
+        if (Math.hypot(player.x - bug.x, player.y - bug.y) < 45) {
+          if (!player.equipped.net) {
+            showFloatingText("잠자리채를 장착해야 잡을 수 있습니다! (가방: I)", player.x, player.y - 35, '#f87171');
+            return;
+          }
+
+          const currentNet = player.equipped.net;
+          sfx.pickup();
+          const itemKey = `bug_${bug.dbIdx}`;
+          const item = ITEM_DB[itemKey];
+          player.inventory.push(itemKey);
+          showFloatingText(`+1 ${item.name} ${item.icon}`, bug.x, bug.y - 25, '#a855f7');
+          bugs.splice(i, 1);
+          setTimeout(spawnBug, 5000);
+          updateInventoryUI();
+
+          checkToolBreakage(currentNet, 'net');
+          return;
+        }
+      }
+
+      // Dig Fossils (Requires Shovel Equipped)
+      for (let i = fossils.length - 1; i >= 0; i--) {
+        let f = fossils[i];
+        if (Math.hypot(player.x - f.x, player.y - f.y) < 45) {
+          if (!player.equipped.shovel) {
+            showFloatingText("삽을 장착해야 발굴할 수 있습니다! (가방: I)", player.x, player.y - 35, '#f87171');
+            return;
+          }
+
+          if (Math.random() < 0.12) {
+            player.isTrapped = true;
+            player.trappedTimer = 90;
+            showFloatingText("😱 으악! 땅을 파다 구덩이에 빠졌습니다!", player.x, player.y - 35, '#ef4444');
+            return;
+          }
+
+          const currentShovel = player.equipped.shovel;
+          sfx.pickup();
+          const randomFossilIdx = Math.floor(Math.random() * REAL_FOSSILS.length);
+          const itemKey = `fossil_${randomFossilIdx}`;
+          const item = ITEM_DB[itemKey];
+          player.inventory.push(itemKey);
+          showFloatingText(`+1 ${item.name} ${item.icon}`, f.x, f.y - 25, '#eab308');
+          fossils.splice(i, 1);
+          setTimeout(spawnFossil, 7000);
+          updateInventoryUI();
+
+          checkToolBreakage(currentShovel, 'shovel');
+          return;
+        }
+      }
+
+      // Fishing Cast
+      if (player.y >= 800) {
+        startFishing();
+        return;
+      }
+    }
+
+    function showFloatingText(text, x, y, color = '#ffffff') {
+      floatingTexts.push({ text, x, y, alpha: 1.0, color });
+    }
+
+    /* ==========================================
+       UPDATE & RENDER ENGINE
+       ========================================== */
+    function update() {
+      gameTime += 0.25;
+      if (gameTime >= 24 * 60) gameTime = 0;
+      updateTimeDisplay();
+
+      if (player.isTrapped) {
+        player.trappedTimer--;
+        if (player.trappedTimer <= 0) player.isTrapped = false;
+      }
+
+      trees.forEach(t => {
+        if (!t.hasFruit) {
+          t.respawnTimer--;
+          if (t.respawnTimer <= 0) t.hasFruit = true;
+        }
+      });
+
+      bugs.forEach(b => {
+        b.x += b.vx; b.y += b.vy;
+        if (b.x < 100 || b.x > WORLD_WIDTH - 100) b.vx *= -1;
+        if (b.y < 100 || b.y > 750) b.vy *= -1;
+      });
+
+      updateFishing();
+
+      let dx = 0, dy = 0;
+      if (!player.isTrapped) {
+        if (keys['arrowleft'] || keys['a'] || touchKeys.left) { dx -= 1; player.dir = 'left'; }
+        if (keys['arrowright'] || keys['d'] || touchKeys.right) { dx += 1; player.dir = 'right'; }
+        if (keys['arrowup'] || keys['w'] || touchKeys.up) { dy -= 1; player.dir = 'up'; }
+        if (keys['arrowdown'] || keys['s'] || touchKeys.down) { dy += 1; player.dir = 'down'; }
+      }
+
+      if (dx !== 0 && dy !== 0) { dx *= 0.7071; dy *= 0.7071; }
+
+      if (dx !== 0 || dy !== 0) {
+        player.isMoving = true;
+        // Apply exponential speed penalty based on poison stacks!
+        const speedMultiplier = Math.pow(0.5, player.poisonStungCount);
+        const currentSpeed = Math.max(0.5, player.baseSpeed * speedMultiplier);
+        
+        if (currentMap === 'island') {
+          player.x = Math.max(50, Math.min(WORLD_WIDTH - 50, player.x + dx * currentSpeed));
+          player.y = Math.max(50, Math.min(WORLD_HEIGHT - 60, player.y + dy * currentSpeed));
+        } else {
+          player.x = Math.max(200, Math.min(700, player.x + dx * currentSpeed));
+          player.y = Math.max(160, Math.min(520, player.y + dy * currentSpeed));
+        }
+
+        player.animTimer++;
+        if (player.animTimer % 8 === 0) player.animFrame = (player.animFrame + 1) % 4;
+      } else {
+        player.isMoving = false;
+        player.animFrame = 0;
+      }
+
+      for (let i = floatingTexts.length - 1; i >= 0; i--) {
+        let ft = floatingTexts[i];
+        ft.y -= 0.8;
+        ft.alpha -= 0.015;
+        if (ft.alpha <= 0) floatingTexts.splice(i, 1);
+      }
+
+      updateActionPrompt();
+    }
+
+    function updateActionPrompt() {
+      const prompt = document.getElementById('action-prompt');
+      const actionText = document.getElementById('action-text');
+      let foundText = null;
+
+      if (currentMap === 'house') {
+        const bedObj = houseInteriorFurniture.find(f => f.id === 'furniture_bed');
+        if (bedObj && Math.hypot(player.x - bedObj.x, player.y - bedObj.y) < 55) {
+          foundText = "동작: 침대에서 쉬고 중첩 독 완치 😴";
+        } else if (player.y > 480) {
+          foundText = "동작: 섬 밖으로 나가기";
+        }
+      } else {
+        const distHouse = Math.hypot(player.x - (playerHouse.x + playerHouse.width/2), player.y - (playerHouse.y + playerHouse.height));
+        if (distHouse < 45) foundText = "동작: 내 집으로 들어가기";
+
+        if (!foundText && Math.hypot(player.x - (mineZoneObj.x + mineZoneObj.width/2), player.y - (mineZoneObj.y + mineZoneObj.height/2)) < 80) {
+          foundText = "동작: ⛏️ 신비한 광산 타이밍 채굴";
+        }
+        if (!foundText && Math.hypot(player.x - craftBenchObj.x, player.y - craftBenchObj.y) < 55) {
+          foundText = "동작: DIY 제작 작업대 사용";
+        }
+        if (!foundText && Math.hypot(player.x - (shopBuilding.x + shopBuilding.width/2), player.y - (shopBuilding.y + shopBuilding.height/2)) < 75) {
+          foundText = "동작: 너굴 상점 입장";
+        }
+        if (!foundText && Math.hypot(player.x - (museumBuilding.x + museumBuilding.width/2), player.y - (museumBuilding.y + museumBuilding.height/2)) < 80) {
+          foundText = "동작: 박물관 기증 & 구경";
+        }
+
+        if (!foundText) {
+          for (let t of trees) {
+            if (Math.hypot(player.x - t.x, player.y - t.y) < 50) {
+              foundText = t.hasFruit ? `동작: ${ITEM_DB[t.fruit].name} 나무 털기` : "동작: 나무 치기 (목재/벌집)";
+              break;
+            }
+          }
+        }
+
+        if (!foundText && player.y >= 800) {
+          foundText = fishingState.active ? "동작: 낚싯줄 당기기!" : "동작: 낚싯줄 던지기";
+        }
+      }
+
+      if (foundText) {
+        prompt.classList.remove('hidden');
+        actionText.innerText = foundText;
+
+        const cameraX = Math.max(0, Math.min(WORLD_WIDTH - canvas.width, player.x - canvas.width / 2));
+        const cameraY = Math.max(0, Math.min(WORLD_HEIGHT - canvas.height, player.y - canvas.height / 2));
+        const screenX = (player.x - cameraX) * (canvas.clientWidth / canvas.width);
+        const screenY = (player.y - cameraY - 50) * (canvas.clientHeight / canvas.height);
+
+        prompt.style.left = `${screenX}px`;
+        prompt.style.top = `${screenY}px`;
+      } else {
+        prompt.classList.add('hidden');
+      }
+    }
+
+    function render() {
+      if (currentMap === 'house') {
+        renderHouseInterior();
+        return;
+      }
+
+      const cameraX = Math.max(0, Math.min(WORLD_WIDTH - canvas.width, player.x - canvas.width / 2));
+      const cameraY = Math.max(0, Math.min(WORLD_HEIGHT - canvas.height, player.y - canvas.height / 2));
+
+      ctx.save();
+      ctx.translate(-cameraX, -cameraY);
+
+      // Grass Base
+      ctx.fillStyle = '#55efc4'; ctx.fillRect(0, 0, WORLD_WIDTH, WORLD_HEIGHT);
+      ctx.fillStyle = '#00b894';
+      for (let x = 60; x < WORLD_WIDTH; x += 140) {
+        for (let y = 60; y < WORLD_HEIGHT - 300; y += 120) {
+          ctx.beginPath(); ctx.arc(x, y, 14, 0, Math.PI * 2); ctx.fill();
+        }
+      }
+
+      // Beach & Ocean
+      ctx.fillStyle = '#ffeaa7'; ctx.fillRect(0, 810, WORLD_WIDTH, 70);
+      ctx.fillStyle = '#74b9ff'; ctx.fillRect(0, 880, WORLD_WIDTH, WORLD_HEIGHT - 880);
+
+      // Mining Rocks Area
+      ctx.fillStyle = '#636e72';
+      ctx.beginPath(); ctx.roundRect(mineZoneObj.x, mineZoneObj.y, mineZoneObj.width, mineZoneObj.height, 16); ctx.fill();
+      ctx.fillStyle = '#fff'; ctx.font = '24px sans-serif'; ctx.fillText('⛰️⛏️', mineZoneObj.x + 35, mineZoneObj.y + 55);
+      ctx.font = '12px Jua'; ctx.fillText("신비한 광산", mineZoneObj.x + 35, mineZoneObj.y + 85);
+
+      // Rain Effects
+      if (isRaining) {
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.4)';
+        ctx.lineWidth = 1.5;
+        const timeOffset = Date.now() * 0.05;
+        for (let i = 0; i < 80; i++) {
+          let rx = (i * 25 + timeOffset * 5) % WORLD_WIDTH;
+          let ry = (i * 18 + timeOffset * 10) % WORLD_HEIGHT;
+          ctx.beginPath(); ctx.moveTo(rx, ry); ctx.lineTo(rx - 4, ry + 12); ctx.stroke();
+        }
+      }
+
+      // Plaza Pathways
+      ctx.fillStyle = '#eccc68';
+      ctx.beginPath(); ctx.roundRect(shopBuilding.x - 30, shopBuilding.y + 40, 360, 90, 16); ctx.fill();
+
+      // Crafting Bench
+      ctx.fillStyle = '#b71540';
+      ctx.fillRect(craftBenchObj.x, craftBenchObj.y, craftBenchObj.width, craftBenchObj.height);
+      ctx.fillStyle = '#fff'; ctx.font = '16px sans-serif'; ctx.fillText('🔨', craftBenchObj.x + 14, craftBenchObj.y + 26);
+
+      // Fossils Ground Dig Spots
+      fossils.forEach(f => {
+        ctx.strokeStyle = '#78e08f'; ctx.lineWidth = 4;
+        ctx.beginPath(); ctx.moveTo(f.x - 8, f.y - 8); ctx.lineTo(f.x + 8, f.y + 8);
+        ctx.moveTo(f.x + 8, f.y - 8); ctx.lineTo(f.x - 8, f.y + 8); ctx.stroke();
+      });
+
+      // Shop
+      ctx.fillStyle = '#e67e22'; ctx.fillRect(shopBuilding.x, shopBuilding.y, shopBuilding.width, shopBuilding.height);
+      ctx.fillStyle = '#d35400';
+      ctx.beginPath(); ctx.moveTo(shopBuilding.x - 10, shopBuilding.y);
+      ctx.lineTo(shopBuilding.x + shopBuilding.width/2, shopBuilding.y - 35);
+      ctx.lineTo(shopBuilding.x + shopBuilding.width + 10, shopBuilding.y); ctx.fill();
+      ctx.fillStyle = '#fff'; ctx.font = '20px sans-serif'; ctx.fillText('🏪', shopBuilding.x + 36, shopBuilding.y + 45);
+
+      // Museum
+      ctx.fillStyle = '#2c3e50'; ctx.fillRect(museumBuilding.x, museumBuilding.y, museumBuilding.width, museumBuilding.height);
+      ctx.fillStyle = '#34495e';
+      ctx.beginPath(); ctx.moveTo(museumBuilding.x - 10, museumBuilding.y);
+      ctx.lineTo(museumBuilding.x + museumBuilding.width/2, museumBuilding.y - 35);
+      ctx.lineTo(museumBuilding.x + museumBuilding.width + 10, museumBuilding.y); ctx.fill();
+      ctx.fillStyle = '#fff'; ctx.font = '22px sans-serif'; ctx.fillText('🦉', museumBuilding.x + 40, museumBuilding.y + 48);
+
+      // Player House
+      const hColor = player.houseUpgrade === 0 ? '#3498db' : '#9b59b6';
+      ctx.fillStyle = hColor; ctx.fillRect(playerHouse.x, playerHouse.y, playerHouse.width, playerHouse.height);
+      ctx.fillStyle = '#2980b9';
+      ctx.beginPath(); ctx.moveTo(playerHouse.x - 8, playerHouse.y);
+      ctx.lineTo(playerHouse.x + playerHouse.width/2, playerHouse.y - 30);
+      ctx.lineTo(playerHouse.x + playerHouse.width + 8, playerHouse.y); ctx.fill();
+      ctx.fillStyle = '#fff'; ctx.font = '12px Jua'; ctx.fillText("내 집", playerHouse.x + 30, playerHouse.y + 45);
+
+      // Trees
+      trees.forEach(t => {
+        ctx.fillStyle = '#795548'; ctx.fillRect(t.x - 8, t.y - 10, 16, 25);
+        ctx.fillStyle = '#2e7d32';
+        ctx.beginPath(); ctx.arc(t.x, t.y - 25, t.radius, 0, Math.PI * 2); ctx.fill();
+        if (t.hasFruit) {
+          ctx.font = '16px sans-serif';
+          ctx.fillText(ITEM_DB[t.fruit].icon, t.x - 12, t.y - 25);
+        }
+      });
+
+      // Bugs
+      bugs.forEach(b => {
+        const item = ITEM_DB[`bug_${b.dbIdx}`];
+        ctx.font = '16px sans-serif';
+        ctx.fillText(item.icon, b.x, b.y);
+      });
+
+      // Fishing Line
+      if (fishingState.active) {
+        ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 1.5;
+        ctx.beginPath(); ctx.moveTo(player.x, player.y - 10); ctx.lineTo(fishingState.bobberX, fishingState.bobberY); ctx.stroke();
+        ctx.fillStyle = '#ff4757'; ctx.beginPath(); ctx.arc(fishingState.bobberX, fishingState.bobberY, 5, 0, Math.PI * 2); ctx.fill();
+        if (fishingState.stage === 'nibble') {
+          ctx.fillStyle = '#ff0000'; ctx.font = 'bold 24px Jua'; ctx.fillText('!', fishingState.bobberX - 4, fishingState.bobberY - 15);
+        }
+      }
+
+      renderPlayerAvatar(player.x, player.y);
+
+      // Floating Popups
+      floatingTexts.forEach(ft => {
+        ctx.fillStyle = ft.color; ctx.globalAlpha = Math.max(0, ft.alpha);
+        ctx.font = 'bold 16px Jua'; ctx.fillText(ft.text, ft.x - 20, ft.y);
+        ctx.globalAlpha = 1.0;
+      });
+
+      // Night Lighting Overlay
+      let nightAlpha = 0;
+      const hour = gameTime / 60;
+      if (hour >= 19 || hour < 5) nightAlpha = 0.45;
+      else if (hour >= 17) nightAlpha = (hour - 17) / 2 * 0.45;
+
+      if (nightAlpha > 0) {
+        ctx.fillStyle = `rgba(15, 23, 42, ${nightAlpha})`;
+        ctx.fillRect(cameraX, cameraY, canvas.width, canvas.height);
+      }
+
+      ctx.restore();
+    }
+
+    function renderPlayerAvatar(px, py) {
+      const bobbing = player.isMoving ? Math.sin(player.animFrame * Math.PI / 2) * 3 : 0;
+      
+      // Shadow
+      ctx.fillStyle = 'rgba(0,0,0,0.2)';
+      ctx.beginPath(); ctx.ellipse(px, py + 16, 14, 6, 0, 0, Math.PI * 2); ctx.fill();
+
+      // Top Clothing
+      const topItem = ITEM_DB[player.equipped.top] || ITEM_DB['top_red'];
+      ctx.fillStyle = topItem.color || '#ff6b6b';
+      ctx.beginPath(); ctx.roundRect(px - 10, py - 5 + bobbing, 20, 20, 6); ctx.fill();
+
+      // Head
+      ctx.fillStyle = '#ffeaa7';
+      ctx.beginPath(); ctx.arc(px, py - 14 + bobbing, 13, 0, Math.PI * 2); ctx.fill();
+
+      // Eyes & Swollen Stung Effect (Visualizes Stung Stacks)
+      ctx.fillStyle = '#2d3436';
+      if (player.poisonStungCount > 0) {
+        ctx.font = '10px sans-serif'; 
+        const eyeSymbol = player.poisonStungCount > 2 ? '💀' : '❌';
+        ctx.fillText(eyeSymbol, px - 8, py - 12 + bobbing);
+      } else {
+        ctx.fillRect(px - 5, py - 15 + bobbing, 3, 5);
+        ctx.fillRect(px + 2, py - 15 + bobbing, 3, 5);
+      }
+
+      // Hat
+      const hatItem = ITEM_DB[player.equipped.hat];
+      if (hatItem) {
+        ctx.font = '22px sans-serif';
+        ctx.fillText(hatItem.icon, px - 11, py - 20 + bobbing);
+      }
+
+      // Trapped Effect Indicator
+      if (player.isTrapped) {
+        ctx.fillStyle = '#ef4444'; ctx.font = 'bold 16px Jua';
+        ctx.fillText("💫 구덩이!", px - 20, py - 35);
+      }
+    }
+
+    function renderHouseInterior() {
+      ctx.fillStyle = '#2c3e50'; ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+      // Floor & Wall
+      ctx.fillStyle = '#f5cd79'; ctx.fillRect(180, 140, 540, 400);
+      ctx.fillStyle = '#eccc68'; ctx.fillRect(180, 100, 540, 40);
+
+      // Placed Furniture
+      houseInteriorFurniture.forEach(f => {
+        const item = ITEM_DB[f.id];
+        if (item) {
+          ctx.font = '36px sans-serif';
+          ctx.fillText(item.icon, f.x, f.y);
+        }
+      });
+
+      // Exit Door
+      ctx.fillStyle = '#e74c3c'; ctx.fillRect(410, 520, 80, 20);
+      ctx.fillStyle = '#fff'; ctx.font = '12px Jua'; ctx.fillText("출구", 436, 535);
+
+      renderPlayerAvatar(player.x, player.y);
+    }
+
+    /* ==========================================
+       UI & TAB CONTROLS
+       ========================================== */
+    function toggleModal(id) {
+      const modal = document.getElementById(id);
+      if (modal.classList.contains('hidden')) {
+        modal.classList.remove('hidden');
+        if (id === 'inventory-modal') updateInventoryUI();
+        if (id === 'shop-modal') switchShopTab('tools');
+        if (id === 'museum-modal') switchMuseumTab('fish');
+        if (id === 'craft-modal') renderCraftingUI();
+      } else {
+        modal.classList.add('hidden');
+      }
+    }
+
+    function updateTimeDisplay() {
+      const hours = Math.floor(gameTime / 60);
+      const mins = Math.floor(gameTime % 60);
+      const paddedMins = mins < 10 ? '0' + mins : mins;
+      document.getElementById('time-display').innerText = `${hours >= 19 || hours < 6 ? '밤' : '낮'} ${hours}:${paddedMins}`;
+      document.getElementById('time-icon').innerText = hours >= 19 || hours < 6 ? '🌙' : '☀️';
+    }
+
+    function updateBellsUI() {
+      document.getElementById('bells-display').innerText = player.bells.toLocaleString();
+    }
+
+    // INVENTORY UI
+    function updateInventoryUI() {
+      const grid = document.getElementById('inventory-grid');
+      grid.innerHTML = '';
+
+      const hatItem = ITEM_DB[player.equipped.hat] || { icon: '🧢', name: '없음' };
+      const topItem = ITEM_DB[player.equipped.top] || { icon: '👕', name: '기본' };
+      const rodItem = ITEM_DB[player.equipped.rod] || { name: '없음' };
+      const netItem = ITEM_DB[player.equipped.net] || { name: '없음' };
+      const shovelItem = ITEM_DB[player.equipped.shovel] || { name: '없음' };
+      const pickaxeItem = ITEM_DB[player.equipped.pickaxe] || { name: '없음' };
+
+      document.getElementById('equipped-hat-icon').innerText = hatItem.icon;
+      document.getElementById('equipped-hat-name').innerText = hatItem.name;
+      document.getElementById('equipped-top-icon').innerText = topItem.icon;
+      document.getElementById('equipped-top-name').innerText = topItem.name;
+      document.getElementById('equipped-rod-name').innerText = rodItem.name;
+      document.getElementById('equipped-net-name').innerText = netItem.name;
+      document.getElementById('equipped-shovel-name').innerText = shovelItem.name;
+      document.getElementById('equipped-pickaxe-name').innerText = pickaxeItem.name;
+
+      player.inventory.forEach((itemId, idx) => {
+        const item = ITEM_DB[itemId] || { name: '아이템', icon: '📦', price: 50 };
+        const isEquipped = Object.values(player.equipped).includes(itemId);
+
+        const slot = document.createElement('div');
+        slot.className = `border-2 rounded-xl p-1.5 flex flex-col items-center justify-center relative cursor-pointer active:scale-95 transition-transform ${isEquipped ? 'bg-amber-200 border-amber-600 font-bold' : 'bg-[#f0e3c4] border-[#a67c42]'}`;
+        slot.innerHTML = `
+          <span class="text-xl sm:text-2xl mb-0.5">${item.icon}</span>
+          <span class="text-[10px] sm:text-[11px] font-bold text-[#5c3a1b] text-center leading-tight line-clamp-1">${item.name}</span>
+          <span class="text-[8px] sm:text-[9px] text-amber-800 font-semibold">${item.price.toLocaleString()} 벨</span>
+          ${isEquipped ? '<span class="absolute top-1 right-1 text-[8px] bg-amber-600 text-white px-1 rounded-full">E</span>' : ''}
+        `;
+        slot.onclick = () => {
+          if (item.type === 'hat') player.equipped.hat = itemId;
+          if (item.type === 'top') player.equipped.top = itemId;
+          if (item.type === 'tool_rod') player.equipped.rod = (player.equipped.rod === itemId ? null : itemId);
+          if (item.type === 'tool_net') player.equipped.net = (player.equipped.net === itemId ? null : itemId);
+          if (item.type === 'tool_shovel') player.equipped.shovel = (player.equipped.shovel === itemId ? null : itemId);
+          if (item.type === 'tool_pickaxe') player.equipped.pickaxe = (player.equipped.pickaxe === itemId ? null : itemId);
+          
+          sfx.equip();
+          updateInventoryUI();
+        };
+        grid.appendChild(slot);
+      });
+
+      for (let i = player.inventory.length; i < 16; i++) {
+        const empty = document.createElement('div');
+        empty.className = 'bg-[#e2d4b3]/50 border-2 border-dashed border-[#b89868] rounded-xl min-h-[55px] flex items-center justify-center';
+        empty.innerHTML = `<span class="text-gray-400 text-xs">${i + 1}</span>`;
+        grid.appendChild(empty);
+      }
+    }
+
+    // SHOP TABS SWITCHING LOGIC
+    let currentShopTab = 'tools';
+    const selectedSellIndices = new Set();
+
+    const shopCategoryItems = {
+      tools: [
+        { id: 'tool_rod_1', price: 400 },
+        { id: 'tool_net_1', price: 400 },
+        { id: 'tool_shovel_1', price: 400 },
+        { id: 'tool_pickaxe_1', price: 500 },
+        { id: 'iron', price: 300 }
+      ],
+      fashion: [
+        { id: 'hat_straw', price: 800 },
+        { id: 'hat_crown', price: 12000 },
+        { id: 'hat_frog', price: 2500 },
+        { id: 'hat_pirate', price: 4500 },
+        { id: 'top_tuxedo', price: 3500 },
+        { id: 'top_royal', price: 8500 },
+        { id: 'top_hawaiian', price: 2200 }
+      ],
+      furniture: [
+        { id: 'furniture_bed', price: 2000 },
+        { id: 'furniture_sofa', price: 3200 },
+        { id: 'furniture_tv', price: 8800 },
+        { id: 'furniture_plant', price: 1200 },
+        { id: 'furniture_throne', price: 50000 }
+      ]
+    };
+
+    function switchShopTab(tabKey) {
+      currentShopTab = tabKey;
+      ['tools', 'fashion', 'furniture', 'sell'].forEach(k => {
+        const btn = document.getElementById(`tab-shop-${k}`);
+        if (k === tabKey) btn.className = 'tab-btn tab-active';
+        else btn.className = 'tab-btn tab-inactive';
+      });
+
+      const buyArea = document.getElementById('shop-content-buy');
+      const sellArea = document.getElementById('shop-content-sell');
+
+      if (tabKey === 'sell') {
+        buyArea.classList.add('hidden');
+        sellArea.classList.remove('hidden');
+        selectedSellIndices.clear();
+        player.inventory.forEach((_, idx) => selectedSellIndices.add(idx));
+        renderShopSell();
+      } else {
+        sellArea.classList.add('hidden');
+        buyArea.classList.remove('hidden');
+        renderShopBuyCategory(tabKey);
+      }
+    }
+
+    function renderShopBuyCategory(catKey) {
+      const container = document.getElementById('shop-content-buy');
+      container.innerHTML = '';
+
+      const items = shopCategoryItems[catKey] || [];
+      items.forEach(item => {
+        const dbItem = ITEM_DB[item.id];
+        const card = document.createElement('div');
+        card.className = 'bg-[#f0e3c4] border-2 border-[#a67c42] rounded-xl p-2 flex justify-between items-center';
+        card.innerHTML = `
+          <div class="flex items-center gap-2">
+            <span class="text-xl sm:text-2xl">${dbItem.icon}</span>
+            <div>
+              <div class="font-bold text-[#5c3a1b] text-xs sm:text-sm">${dbItem.name}</div>
+              <div class="text-[10px] sm:text-xs text-amber-900 font-semibold">${item.price.toLocaleString()} 벨</div>
+            </div>
+          </div>
+          <button class="btn-wood px-2.5 py-1 rounded-lg text-xs font-bold bg-amber-600 border-amber-800" onclick="buyShopItem('${item.id}', ${item.price})">구매</button>
+        `;
+        container.appendChild(card);
+      });
+    }
+
+    window.buyShopItem = function(id, price) {
+      if (player.bells < price) {
+        showFloatingText("벨이 부족합니다!", player.x, player.y - 30, '#ef4444');
+        return;
+      }
+      player.bells -= price;
+      player.inventory.push(id);
+
+      const targetType = ITEM_DB[id]?.type;
+      if (targetType === 'tool_rod' && !player.equipped.rod) player.equipped.rod = id;
+      if (targetType === 'tool_net' && !player.equipped.net) player.equipped.net = id;
+      if (targetType === 'tool_shovel' && !player.equipped.shovel) player.equipped.shovel = id;
+      if (targetType === 'tool_pickaxe' && !player.equipped.pickaxe) player.equipped.pickaxe = id;
+
+      if (targetType === 'furniture') {
+        houseInteriorFurniture.push({ id, x: 250 + (houseInteriorFurniture.length * 80) % 400, y: 220 });
+      }
+
+      sfx.coins();
+      updateBellsUI();
+      updateInventoryUI();
+      showFloatingText("구매 완료! 🛍️", player.x, player.y - 30, '#facc15');
+    };
+
+    function renderShopSell() {
+      const list = document.getElementById('sell-list');
+      list.innerHTML = '';
+      let total = 0;
+
+      player.inventory.forEach((itemId, idx) => {
+        const item = ITEM_DB[itemId] || { name: '아이템', price: 50, icon: '📦' };
+        const isChecked = selectedSellIndices.has(idx);
+        if (isChecked) total += item.price;
+
+        const row = document.createElement('div');
+        row.className = `border rounded-lg p-1.5 flex justify-between items-center text-xs cursor-pointer ${isChecked ? 'bg-[#f0e3c4] border-[#a67c42]' : 'bg-gray-100 border-gray-300 opacity-60'}`;
+        row.innerHTML = `
+          <div class="flex items-center gap-2">
+            <input type="checkbox" ${isChecked ? 'checked' : ''} class="pointer-events-none">
+            <span>${item.icon} ${item.name}</span>
+          </div>
+          <span class="font-bold text-amber-900">+${item.price.toLocaleString()} 벨</span>
+        `;
+        row.onclick = () => {
+          if (selectedSellIndices.has(idx)) selectedSellIndices.delete(idx);
+          else selectedSellIndices.add(idx);
+          renderShopSell();
+        };
+        list.appendChild(row);
+      });
+
+      document.getElementById('sell-total-price').innerText = `${total.toLocaleString()} 벨`;
+    }
+
+    document.getElementById('btn-toggle-select-all').onclick = () => {
+      if (selectedSellIndices.size === player.inventory.length) {
+        selectedSellIndices.clear();
+      } else {
+        player.inventory.forEach((_, idx) => selectedSellIndices.add(idx));
+      }
+      renderShopSell();
+    };
+
+    document.getElementById('btn-sell-selected').onclick = () => {
+      if (selectedSellIndices.size === 0) return;
+
+      let earned = 0;
+      const remainingInventory = [];
+      
+      player.inventory.forEach((itemId, idx) => {
+        if (selectedSellIndices.has(idx)) {
+          earned += (ITEM_DB[itemId]?.price || 50);
+          if (player.equipped.rod === itemId) player.equipped.rod = null;
+          if (player.equipped.net === itemId) player.equipped.net = null;
+          if (player.equipped.shovel === itemId) player.equipped.shovel = null;
+          if (player.equipped.pickaxe === itemId) player.equipped.pickaxe = null;
+        } else {
+          remainingInventory.push(itemId);
+        }
+      });
+
+      player.bells += earned;
+      player.inventory = remainingInventory;
+      selectedSellIndices.clear();
+
+      sfx.coins();
+      updateBellsUI();
+      updateInventoryUI();
+      renderShopSell();
+      showFloatingText(`+${earned.toLocaleString()} 벨 획득! 🔔`, player.x, player.y - 30, '#facc15');
+    };
+
+    document.getElementById('tab-shop-tools').onclick = () => switchShopTab('tools');
+    document.getElementById('tab-shop-fashion').onclick = () => switchShopTab('fashion');
+    document.getElementById('tab-shop-furniture').onclick = () => switchShopTab('furniture');
+    document.getElementById('tab-shop-sell').onclick = () => switchShopTab('sell');
+
+    // MUSEUM TAB SWITCHING LOGIC
+    let currentMuseumTab = 'fish';
+    function switchMuseumTab(tabKey) {
+      currentMuseumTab = tabKey;
+      ['fish', 'bugs', 'fossils'].forEach(k => {
+        const btn = document.getElementById(`tab-museum-${k}`);
+        if (k === tabKey) btn.className = 'tab-btn tab-active';
+        else btn.className = 'tab-btn tab-inactive';
+      });
+
+      renderMuseumGrid(tabKey);
+    }
+
+    function renderMuseumGrid(type) {
+      document.getElementById('count-fish').innerText = museumDonations.fish.size;
+      document.getElementById('count-bugs').innerText = museumDonations.bugs.size;
+      document.getElementById('count-fossils').innerText = museumDonations.fossils.size;
+
+      const grid = document.getElementById('museum-grid');
+      grid.innerHTML = '';
+
+      let listData = [];
+      let donationSet = museumDonations.fish;
+
+      if (type === 'fish') { listData = FISH_DATA; donationSet = museumDonations.fish; }
+      if (type === 'bugs') { listData = BUGS_DATA; donationSet = museumDonations.bugs; }
+      if (type === 'fossils') {
+        listData = REAL_FOSSILS.map((name, idx) => ({ name, icon: '🦴', dbIdx: idx }));
+        donationSet = museumDonations.fossils;
+      }
+
+      listData.forEach((item, idx) => {
+        const isDonated = donationSet.has(idx);
+        const card = document.createElement('div');
+        card.className = `p-1.5 rounded-xl border-2 flex flex-col items-center justify-center ${isDonated ? 'bg-emerald-100 border-emerald-600' : 'bg-gray-200 border-gray-400 opacity-60'}`;
+        card.innerHTML = `
+          <span class="text-xl sm:text-2xl">${isDonated ? item.icon : '❓'}</span>
+          <span class="text-[10px] font-bold text-[#5c3a1b] text-center line-clamp-1 mt-0.5">${isDonated ? item.name : '미기증'}</span>
+        `;
+        grid.appendChild(card);
+      });
+    }
+
+    function donateAllItems() {
+      let count = 0;
+      for (let i = player.inventory.length - 1; i >= 0; i--) {
+        const id = player.inventory[i];
+        const item = ITEM_DB[id];
+        if (item) {
+          if (item.type === 'fish') { museumDonations.fish.add(item.dbIdx); player.inventory.splice(i, 1); count++; }
+          if (item.type === 'bug') { museumDonations.bugs.add(item.dbIdx); player.inventory.splice(i, 1); count++; }
+          if (item.type === 'fossil') { museumDonations.fossils.add(item.dbIdx); player.inventory.splice(i, 1); count++; }
+        }
+      }
+      if (count > 0) {
+        sfx.fanfare();
+        updateInventoryUI();
+        showFloatingText(`🏛️ ${count}개 기증 완료!`, player.x, player.y - 35, '#22c55e');
+      }
+    }
+
+    document.getElementById('tab-museum-fish').onclick = () => switchMuseumTab('fish');
+    document.getElementById('tab-museum-bugs').onclick = () => switchMuseumTab('bugs');
+    document.getElementById('tab-museum-fossils').onclick = () => switchMuseumTab('fossils');
+
+    document.getElementById('btn-donate-all').onclick = () => {
+      donateAllItems();
+      renderMuseumGrid(currentMuseumTab);
+    };
+
+    // TIER PROGRESSION DIY CRAFTING SYSTEM
+    const recipes = [
+      // Tier 1 Recipes
+      { id: 'tool_rod_1', tier: 1, name: '엉성한 낚싯대 🎣', reqs: { wood: 3 } },
+      { id: 'tool_net_1', tier: 1, name: '엉성한 잠자리채 🕸️', reqs: { softwood: 3 } },
+      { id: 'tool_shovel_1', tier: 1, name: '엉성한 삽 ⛏️', reqs: { hardwood: 3 } },
+      { id: 'tool_pickaxe_1', tier: 1, name: '엉성한 곡괭이 ⛏️', reqs: { wood: 2, softwood: 2 } },
+      { id: 'furniture_bed', tier: 1, name: '통나무 침대 🛏️', reqs: { hardwood: 4, wood: 2 } },
+
+      // Tier 2 Progression Recipes
+      { id: 'tool_rod_2', tier: 2, name: '튼튼한 낚싯대 🎣', reqs: { tool_rod_1: 1, iron: 2 } },
+      { id: 'tool_net_2', tier: 2, name: '튼튼한 잠자리채 🕸️', reqs: { tool_net_1: 1, iron: 2 } },
+      { id: 'tool_shovel_2', tier: 2, name: '튼튼한 삽 ⛏️', reqs: { tool_shovel_1: 1, iron: 2 } },
+      { id: 'tool_pickaxe_2', tier: 2, name: '튼튼한 곡괭이 ⛏️', reqs: { tool_pickaxe_1: 1, iron: 3 } },
+      { id: 'furniture_sofa', tier: 2, name: '폭신한 소파 🛋️', reqs: { furniture_bed: 1, hardwood: 5 } },
+
+      // Tier 3 Masterwork & Gemstone Craft Recipes
+      { id: 'tool_rod_3', tier: 3, name: '황금 낚싯대 ✨', reqs: { tool_rod_2: 1, gold_nugget: 3 } },
+      { id: 'tool_net_3', tier: 3, name: '황금 잠자리채 ✨', reqs: { tool_net_2: 1, gold_nugget: 3 } },
+      { id: 'tool_shovel_3', tier: 3, name: '황금 삽 ✨', reqs: { tool_shovel_2: 1, gold_nugget: 3 } },
+      { id: 'tool_pickaxe_3', tier: 3, name: '황금 곡괭이 ✨', reqs: { tool_pickaxe_2: 1, gold_nugget: 3 } },
+      { id: 'jewel_ring', tier: 3, name: '황금 루비 반지 💍', reqs: { ruby: 2, gold_nugget: 2 } },
+      { id: 'jewel_tiara', tier: 3, name: '사파이어 황가 티아라 👑', reqs: { sapphire: 2, gold_nugget: 3 } },
+      { id: 'jewel_statue', tier: 3, name: '에메랄드 대형 조각상 🗿', reqs: { emerald: 3, gold_nugget: 4 } }
+    ];
+
+    function renderCraftingUI() {
+      const list = document.getElementById('crafting-list');
+      list.innerHTML = '';
+
+      recipes.forEach(rec => {
+        const target = ITEM_DB[rec.id];
+        let canCraft = true;
+        let reqsText = [];
+
+        for (let [mat, count] of Object.entries(rec.reqs)) {
+          const have = player.inventory.filter(i => i === mat).length;
+          reqsText.push(`${ITEM_DB[mat].name} (${have}/${count})`);
+          if (have < count) canCraft = false;
+        }
+
+        const tierBadgeColor = rec.tier === 1 ? 'bg-emerald-600' : (rec.tier === 2 ? 'bg-blue-600' : 'bg-purple-600');
+
+        const card = document.createElement('div');
+        card.className = 'bg-[#f0e3c4] border-2 border-[#a67c42] rounded-xl p-2.5 flex justify-between items-center';
+        card.innerHTML = `
+          <div>
+            <div class="flex items-center gap-1.5">
+              <span class="text-white text-[9px] px-1.5 py-0.5 rounded-full ${tierBadgeColor} font-bold">Tier ${rec.tier}</span>
+              <span class="font-bold text-[#5c3a1b] text-xs sm:text-sm">${target.icon} ${target.name}</span>
+            </div>
+            <div class="text-[10px] sm:text-xs text-amber-900 mt-0.5">재료: ${reqsText.join(', ')}</div>
+          </div>
+          <button class="btn-wood px-2.5 py-1 text-xs font-bold rounded-lg" ${!canCraft ? 'disabled style="opacity:0.5;"' : ''} onclick="craftItem('${rec.id}')">제작하기</button>
+        `;
+        list.appendChild(card);
+      });
+    }
+
+    window.craftItem = function(recipeId) {
+      const rec = recipes.find(r => r.id === recipeId);
+      if (!rec) return;
+
+      for (let [mat, count] of Object.entries(rec.reqs)) {
+        for (let c = 0; c < count; c++) {
+          const idx = player.inventory.indexOf(mat);
+          if (idx !== -1) player.inventory.splice(idx, 1);
+        }
+      }
+
+      player.inventory.push(rec.id);
+
+      if (ITEM_DB[rec.id]?.type === 'furniture') {
+        houseInteriorFurniture.push({ id: rec.id, x: 250 + (houseInteriorFurniture.length * 70) % 400, y: 220 });
+      }
+
+      sfx.fanfare();
+      updateInventoryUI();
+      renderCraftingUI();
+      showFloatingText(`🔨 Tier ${rec.tier} 제작 완료!`, player.x, player.y - 30, '#facc15');
+    };
+
+    // NAV UI TRIGGERS
+    document.getElementById('btn-inventory').onclick = () => toggleModal('inventory-modal');
+    document.getElementById('close-inventory').onclick = () => toggleModal('inventory-modal');
+    document.getElementById('btn-shop').onclick = () => toggleModal('shop-modal');
+    document.getElementById('close-shop').onclick = () => toggleModal('shop-modal');
+    document.getElementById('btn-museum').onclick = () => toggleModal('museum-modal');
+    document.getElementById('close-museum').onclick = () => toggleModal('museum-modal');
+    document.getElementById('btn-craft').onclick = () => toggleModal('craft-modal');
+    document.getElementById('close-craft').onclick = () => toggleModal('craft-modal');
+
+    document.getElementById('btn-audio').onclick = () => {
+      sfx.muted = !sfx.muted;
+      document.getElementById('btn-audio').innerText = sfx.muted ? '🔇' : '🔊';
+    };
+
+    /* ==========================================
+       START ENGINE
+       ========================================== */
+    function gameLoop() {
+      update();
+      render();
+      requestAnimationFrame(gameLoop);
+    }
+
+    window.onload = function() {
+      initWorld();
+      updateBellsUI();
+      gameLoop();
+    };
+  </script>
+</body>
+</html>
